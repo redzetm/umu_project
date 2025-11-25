@@ -1,0 +1,91 @@
+なんても一時保存
+
+「シェルでコマンドを叩いて起動する」だけではなく、実際にコードを書いて
+コンパイルしたバイナリ（BIOS風コード）を QEMU に食わせるイメージで進めるのが本筋です。
+
+########################################
+
+
+🛠 QEMU環境の準備手順
+1. 必要なパッケージのインストール
+Ubuntu環境なら以下を入れておくと安心です：
+sudo apt update
+sudo apt install qemu-system-x86 nasm grub-pc-bin mtools parted
+
+
+- qemu-system-x86 : 仮想マシン本体
+- nasm : アセンブリをバイナリ化するため
+- grub-pc-bin : BIOS版GRUBをディスクにインストールするため
+- mtools/parted : ディスクイメージの作成やパーティション操作用
+
+2. プロジェクト用ディレクトリ構成
+例として：
+umu/
+ ├─ src/        （アセンブリやCコード）
+ ├─ build/      （コンパイル済みバイナリ）
+ ├─ disk/       （ディスクイメージ）
+ └─ scripts/    （補助スクリプト）
+
+
+
+3. BIOS風コードのビルド
+src/umu_bios.asm を書いて、NASMでバイナリ化します：
+nasm -f bin src/umu_bios.asm -o build/umu_bios.bin
+
+
+
+4. GRUBを入れたディスクイメージの作成
+ディスク作成
+dd if=/dev/zero of=disk/disk.img bs=1M count=64
+
+
+パーティション作成とフォーマット
+sudo losetup -fP disk/disk.img
+LOOPDEV=$(sudo losetup -a | grep "disk.img" | awk -F: '{print $1}')
+
+sudo parted -s $LOOPDEV mklabel msdos
+sudo parted -s $LOOPDEV mkpart primary ext2 1MiB 100%
+sudo mkfs.ext2 ${LOOPDEV}p1
+
+
+GRUBインストール
+mkdir -p disk/mnt
+sudo mount ${LOOPDEV}p1 disk/mnt
+sudo grub-install --target=i386-pc --boot-directory=disk/mnt/boot $LOOPDEV
+
+
+GRUB設定ファイル
+sudo mkdir -p disk/mnt/boot/grub
+echo 'set timeout=5
+menuentry "Umu hello" { echo "GRUB起動成功"; }' | sudo tee disk/mnt/boot/grub/grub.cfg
+sudo umount disk/mnt
+sudo losetup -d $LOOPDEV
+
+
+
+5. QEMUで起動
+qemu-system-x86_64 \
+  -bios build/umu_bios.bin \
+  -drive file=disk/disk.img,format=raw
+
+
+- まず「Umu BIOS v0.1」などの文字が表示される
+- その後、GRUBメニューが出れば成功
+
+🎯 まとめ
+- QEMU環境は qemu-system-x86 を入れるだけでOK
+- BIOS風コードをNASMでバイナリ化し、-bios オプションで読み込ませる
+- GRUBは grub-install でディスクイメージに入れておく
+- 起動すると「Umu BIOS → GRUBメニュー」という流れが再現できる
+
+########################################
+
+
+
+
+
+
+
+
+
+
