@@ -8,32 +8,35 @@ bootの一連の手順
 
 ################################################
 
+🔌 電源オンからGRUB起動までの流れ（Umuプロジェクト）
 1. 電源オンの模擬
-- QEMU/KVMで「電源オン」を模擬できます。
-例:
-qemu-system-x86_64 -bios umu_bios.bin
-- umu_bios.bin は自作の最小BIOS風コード。ここで「Umu BIOS v0.1」と表示するだけでもOK。
+- 実機ではCPUがリセットベクタ（0xFFFF0付近）から命令を実行開始します。
+- QEMUでは -bios オプションを使って、自作したバイナリを「電源オン直後に走るコード」として読み込ませることができます。
+- 例:bash
+qemu-system-x86_64 -bios build/umu_bios.bin
+
+- umu_bios.bin はアセンブリで書いた最小のBIOS風コード。ここで「Umu BIOS v0.1」と表示するだけでもOKです。
 
 2. Umu BIOSからGRUBへ
-- 実機ではBIOS/UEFIが「ブートデバイス」を探して、MBRやEFI領域からブートローダーを読み込みます。
+- 実機のBIOSは「ブートデバイスを探してMBRやEFI領域を読み込む」役割を持ちます。
 - Umu BIOSでは簡略化して、固定のディスクイメージからGRUBを呼び出すようにします。
-例:
+- 例:bash
 qemu-system-x86_64 \
-  -bios umu_bios.bin \
-  -drive file=disk.img,format=raw
+  -bios build/umu_bios.bin \
+  -drive file=disk/disk.img,format=raw
 
-
-- disk.img の先頭セクタに GRUB をインストールしておけば、Umu BIOSが「Found boot device」と
-表示した後に制御を渡せます。
+- disk.img の先頭セクタにGRUBをインストールしておけば、Umu BIOSが「Found boot device」と表示した後に制御を渡せます。
 
 3. GRUBの準備
 - GRUBは grub-install コマンドでディスクイメージに書き込めます。
 - 例:
-grub-install --target=i386-pc --boot-directory=./boot ./disk.img
-- これで disk.img のMBRにGRUBが入り、起動時にGRUBメニューが出ます。
+grub-install --target=i386-pc --boot-directory=./disk/boot ./disk.img
 
-4. 出力イメージ（完成イメージ）
-起動時の流れはこんな感じになります：
+- これで disk.img のMBRにGRUBが入り、起動時にGRUBメニューが表示されます。
+- grub.cfg を用意しておけば、メニューに「Umu hello」などを出せます。
+
+4. 起動時のイメージ
+起動すると以下のような流れになります：
 Umu BIOS v0.1
 Initializing...
 Found boot device
@@ -42,6 +45,23 @@ Loading GRUB...
 → ここで GRUB のメニューが表示される。
 
 
+🎯 ポイント
+- シェルで起動するだけではなく、アセンブリでコードを書いてバイナリ化し、それをQEMUに渡すのが本筋。
+- Umu BIOSは「電源オン直後に走るコード」として、文字表示やディスク読み込みを行い、GRUBに制御を渡す。
+- GRUBは disk.img にインストールしておき、Umu BIOSからMBRを読み込んでジャンプすれば起動する。
+
+👉 たまさん、この次のステップは「Umu BIOSでMBRを読み込んでジャンプ」するコードを実際に書くところになります。
+最初は 文字表示だけの最小版から始めますか？ それとも MBR読み込みまで一気にやってみたいですか？
+
+
+
+##################
+一旦次のステップ
+##################
+
+たまさん、次のステップは GRUBをディスクイメージに入れる作業になりますが、
+Umu BIOSからGRUBに渡す方法を「MBR方式（i386-pc）」で行きますか？
+それとも「UEFI方式（x86_64-efi）」で行きたいですか？
 
 
 
