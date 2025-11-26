@@ -1,5 +1,7 @@
 bootの一連の手順
 
+手順完成版は、230行目からです。
+
 流れ
 
 ① 電源投入
@@ -225,10 +227,106 @@ qemu-system-x86_64 -cdrom umu.iso
 GRUBメニューが表示 → 「Umu Project」を選択 → 80x25のテキスト画面に
 UmuのASCIIアートが描画されて止まる。
 
+＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃
+手順書　完成版
+＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃
+
+電源投入から「Umu Project」が表示されるまでの流れ
+① 電源投入とファームウェアの動作
+- 電源投入: CPUはリセットベクタから実行を開始し、マザーボード上のファームウェア（UEFIまたはBIOS互換）が動き出す。
+- 初期化: メモリやデバイスの簡易チェック、ストレージやキーボードなどの検出。
+- 起動対象の決定: ブート順序に従って起動可能なデバイスを探し、ブートローダ（GRUBなど）を起動。
+
+② GRUBによるカーネルの読み込み
+- カーネル探索: GRUBは設定ファイルに従い、ファイルシステムからカーネルバイナリ（ELF形式）を読み込む。
+- Multibootヘッダ確認: 0x1BADB002 のマジック値とフラグ・チェックサムを確認し、Multiboot対応カーネルと認識。
+- 情報引き渡し: GRUBはメモリ情報やビデオ情報を構造体にまとめ、レジスタ経由でカーネルに渡す。
+- エントリポイントへジャンプ: ELFのエントリ _start に制御を移す。
+
+③ カーネル（boot.s）の開始
+- 開始点: _start ラベルから実行開始。BIOS割り込みは使わず、保護モード前提。
+- 初期化: スタック設定や必要ならBSS領域のクリア。
+- 描画処理呼び出し: call draw_ascii により文字列描画ルーチンへ進む。
+- 停止: 無限ループで待機するか、後で入力処理などを追加。
+
+④ 画面への描画
+- VGAテキストモードの場合:
+- 物理アドレス 0xB8000 に文字と属性を書き込む。
+- 1文字＝2バイト（ASCIIコード＋色属性）。
+- 座標計算で中央に「Umu Project」を表示。
+- UEFI環境の場合:
+- VGAテキストがない場合はフレームバッファ情報を利用。
+- ピクセル単位で描画し、文字列をビットマップフォントで表示する。
+
+⑤ 開発手順の流れ
+- アセンブル: nasm -f elf32 src/boot.s -o build/boot.o
+- リンク: リンカスクリプトでMultibootヘッダを先頭に配置し、ldで結合。
+- ISO作成: GRUB設定ファイル（grub.cfg）を用意し、grub-mkrescueでISO生成。
+- 起動テスト: QEMUやKVMでISOを起動し、画面に「Umu Project」が出るか確認。
+
+上記チェックリスト
+開発チェックリスト
+① 準備環境
+- [ ] クロスコンパイラ環境（例: i686-elf-gcc, i686-elf-ld, nasm）を用意
+- [ ] QEMU/KVMなどの仮想環境でテストできる状態にする
+- [ ] GRUBとgrub-mkrescueが利用可能か確認
+
+② ソースコード
+- [ ] src/boot.s に Multibootヘッダ を定義
+- マジック値 0x1BADB002
+- フラグ 0x00000003（メモリ情報＋ビデオ）
+- チェックサム -(MAGIC + FLAGS)
+- [ ] _start ラベルを global 宣言
+- [ ] extern draw_ascii を呼び出す処理を記述
+- [ ] 無限ループで停止する処理を追加
+
+③ リンカスクリプト
+- [ ] ENTRY(_start) を指定
+- [ ] .multiboot セクションを先頭（8KiB以内）に配置
+- [ ] .text, .data, .bss を適切に配置
+
+④ ビルド手順
+- [ ] アセンブル:
+nasm -f elf32 -o build/boot.o src/boot.s
+- [ ] （必要ならCコードもコンパイル）
+- [ ] リンク:
+i686-elf-ld -m elf_i386 -T scripts/linker.ld -o build/umu.bin build/boot.o
 
 
 
+⑤ GRUB設定とISO作成
+- [ ] grub.cfg を作成
+set timeout=0
+set default=0
 
+menuentry "Umu Project" {
+    multiboot /boot/umu.bin
+    boot
+}
+- [ ] ISO構造を作成 (boot/grub/grub.cfg と boot/umu.bin)
+- [ ] ISO生成:
+grub-mkrescue -o build/umu.iso build/iso
+
+
+
+⑥ 起動テスト
+- [ ] QEMUでBIOSモード起動:
+qemu-system-i386 -cdrom build/umu.iso
+- [ ] QEMUでUEFIモード起動（OVMF使用）:
+qemu-system-x86_64 -bios ovmf.bin -cdrom build/umu.iso
+- [ ] 画面に「====================」「Umu Project」が表示されるか確認
+
+⑦ トラブルシュート
+- [ ] Multibootヘッダが先頭8KiB以内にあるか
+- [ ] _start が正しくリンクされているか
+- [ ] VGAテキストバッファ（0xB8000）に文字が書き込まれているか
+- [ ] UEFI環境で表示されない場合はフレームバッファ情報を利用する
+
+⑧ 次の拡張ポイント
+- [ ] スタック初期化
+- [ ] BSS領域のクリア（C導入時）
+- [ ] フレームバッファ描画対応（UEFIネイティブ用）
+- [ ] 簡易ロガーや入力処理の追加
 
 
 
