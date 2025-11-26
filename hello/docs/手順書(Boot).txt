@@ -1,67 +1,220 @@
 bootの一連の手順
 
-################################################
+流れ
 
-1. 電源オン
-2. UEFI/BIOS 起動とハードウェアの初期化
-3. ブートローダー（GRUB）の起動
+① 電源投入
+- CPUがリセットベクタから実行開始
+- UEFIファームウェアが起動し、ハードウェア初期化
+② UEFIがブートローダーを呼び出す（今回はGRUB2）
+- UEFIはNVRAMのブートエントリを参照
+- GRUB2を選択して実行
+③ GRUB2の処理
+- GRUB2が起動し、grub.cfg を読み込む
+- ISOイメージ内のカーネルファイルをロード
+- カーネルに制御を渡す
+④ カーネル起動(カーネルはC言語で書く)
+- カーネルが画面制御を初期化
+- カーネル側のコードで以下を表示（テキストモード描画）
 
-################################################
+====================
+     Umu Project
+====================
+と表示させる。
 
-🔌 電源オンからGRUB起動までの流れ（Umuプロジェクト）
-1. 電源オンの模擬
-- 実機ではCPUがリセットベクタ（0xFFFF0付近）から命令を実行開始します。
-- QEMUでは -bios オプションを使って、自作したバイナリを「電源オン直後に走るコード」として読み込ませることができます。
-- 例:bash
-qemu-system-x86_64 -bios build/umu_bios.bin
+########
+以下、上記に肉付けしていく
+########
 
-- umu_bios.bin はアセンブリで書いた最小のBIOS風コード。ここで「Umu BIOS v0.1」と表示するだけでもOKです。
+Grubで自作OSをISOブートする手順
+ワクワクする最初の一歩から、ISO化・起動・ASCIIアート表示までを「
+最短で確実に動く」流れに絞って案内します。
+GRUBが面倒な初期化を肩代わりしてくれるので、Umu側は「VGAテキスト画面に文字を描く」
+だけに集中できます。
 
-2. Umu BIOSからGRUBへ
-- 実機のBIOSは「ブートデバイスを探してMBRやEFI領域を読み込む」役割を持ちます。
-- Umu BIOSでは簡略化して、固定のディスクイメージからGRUBを呼び出すようにします。
-- 例:bash
-qemu-system-x86_64 \
-  -bios build/umu_bios.bin \
-  -drive file=disk/disk.img,format=raw
+プロジェクトの骨格
+- 標準構成:
+umu/
+  src/
+    boot.s          # Multibootヘッダ＋エントリ
+    vga_text.s      # VGAテキスト描画
+    link.ld         # リンカスクリプト (ELF32)
+  build/
+  iso_root/
+    boot/
+      umu.bin       # GRUBがロードする本体
+      grub/
+        grub.cfg    # GRUBメニュー
+  Makefile
 
-- disk.img の先頭セクタにGRUBをインストールしておけば、Umu BIOSが「Found boot device」と表示した後に制御を渡せます。
+- 必要パッケージ（Ubuntu想定）:bash
 
-3. GRUBの準備
-- GRUBは grub-install コマンドでディスクイメージに書き込めます。
-- 例:
-grub-install --target=i386-pc --boot-directory=./disk/boot ./disk.img
+sudo apt update
+sudo apt install build-essential nasm xorriso grub-pc-bin grub-common
 
-- これで disk.img のMBRにGRUBが入り、起動時にGRUBメニューが表示されます。
-- grub.cfg を用意しておけば、メニューに「Umu hello」などを出せます。
+最小のUmu本体（Multiboot＋VGA描画）
+Multibootヘッダとエントリ
+- src/boot.s
 
-4. 起動時のイメージ
-起動すると以下のような流れになります：
-Umu BIOS v0.1
-Initializing...
-Found boot device
-Loading GRUB...
+; 32-bit ELF想定（GRUBがロード）
+; nasm -f elf32 でアセンブル
 
-→ ここで GRUB のメニューが表示される。
+bits 32
+section .multiboot
+  align 4
+  MULTIBOOT_HEADER_MAGIC  equ 0x1BADB002
+  MULTIBOOT_HEADER_FLAGS  equ 0x00000003   ; 必須: メモリ情報, ビデオモード
+  MULTIBOOT_CHECKSUM      equ -(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)
+
+  dd MULTIBOOT_HEADER_MAGIC
+  dd MULTIBOOT_HEADER_FLAGS
+  dd MULTIBOOT_CHECKSUM
+
+section .text
+global _start
+extern draw_ascii
+
+_start:
+  ; GRUBはすでに保護モード。BIOS割り込みは使わない。
+  ; VGAテキストバッファに直接書く。
+  call draw_ascii
+
+.hang:
+  jmp .hang
 
 
-🎯 ポイント
-- シェルで起動するだけではなく、アセンブリでコードを書いてバイナリ化し、それをQEMUに渡すのが本筋。
-- Umu BIOSは「電源オン直後に走るコード」として、文字表示やディスク読み込みを行い、GRUBに制御を渡す。
-- GRUBは disk.img にインストールしておき、Umu BIOSからMBRを読み込んでジャンプすれば起動する。
 
-👉 たまさん、この次のステップは「Umu BIOSでMBRを読み込んでジャンプ」するコードを実際に書くところになります。
-最初は 文字表示だけの最小版から始めますか？ それとも MBR読み込みまで一気にやってみたいですか？
+VGAテキストにASCIIアートを描く
+- src/vga_text.s
+
+bits 32
+section .text
+global draw_ascii
+
+; VGAテキストモード: 0xB8000 に [文字, 属性] の2バイトペアで並ぶ
+; 属性例: 0x0F = 白文字・黒背景
+draw_ascii:
+  push ebp
+  mov  ebp, esp
+
+  ; 画面クリア（80x25）
+  mov  edi, 0xB8000
+  mov  ecx, 80*25
+  mov  ax, 0x0720        ; ' ' + 明るい灰/黒 (例)
+.clr:
+  stosw
+  loop .clr
+
+  ; 表示開始位置（2行目あたり）
+  mov  edi, 0xB8000 + (80*2)*2
+
+  ; ASCIIアート文字列
+  ; 改行は行オフセットを加算して処理
+  ; ここでは簡易表示
+  ; "Umu Project" を太字的に一行で
+  mov  esi, art
+  mov  bl, 0x0F          ; 白文字
+.next_char:
+  lodsb                   ; AL = *ESI++
+  test al, al
+  jz .done
+  cmp  al, 10             ; LF
+  jne  .print
+  ; 改行: 次の行へ
+  ; 現在の行頭から+80文字分進める
+  ; 行頭計算は省略し「適当に」次行へ（例として+ (80 - 現在行残) は簡略）
+  add  edi, (80 - 12)*2   ; この例は文字数を仮12個として次行に寄せる簡略処理
+  jmp  .next_char
+.print:
+  mov  ah, bl             ; 属性
+  mov  [edi], ax          ; [char, attr]
+  add  edi, 2
+  jmp  .next_char
+.done:
+  pop  ebp
+  ret
+
+section .rodata
+art db "   _   _           ",10
+    db "  | | | | _   _ _ __",10
+    db "  | |_| || | | | '__|",10
+    db "  |  _  || |_| | |   ",10
+    db "  |_| |_| \__,_|_|   ",10
+    db "      Umu Project    ",0
 
 
+リンカスクリプト（ELF32, 低アドレス配置）
+- src/link.ld   (Ld)
 
-##################
-一旦次のステップ
-##################
+ENTRY(_start)
 
-たまさん、次のステップは GRUBをディスクイメージに入れる作業になりますが、
-Umu BIOSからGRUBに渡す方法を「MBR方式（i386-pc）」で行きますか？
-それとも「UEFI方式（x86_64-efi）」で行きたいですか？
+SECTIONS
+{
+  . = 0x00100000;              /* 1MiBに配置（GRUBが問題なくロード可） */
+
+  .multiboot : { *(.multiboot) }
+  .text      : { *(.text*) }
+  .rodata    : { *(.rodata*) }
+  .data      : { *(.data*) }
+  .bss       : { *(.bss*)  }
+}
+
+
+ビルドとISO作成
+Makefile
+• 　　Makefile
+
+TARGET := umu.bin
+BUILD  := build
+SRC    := src
+ISO    := iso_root
+
+NASM   := nasm
+LD     := ld
+
+all: $(BUILD)/$(TARGET) iso
+
+$(BUILD)/$(TARGET): $(BUILD)/boot.o $(BUILD)/vga_text.o $(SRC)/link.ld
+  $(LD) -m elf_i386 -T $(SRC)/link.ld -o $@ $(BUILD)/boot.o $(BUILD)/vga_text.o
+
+$(BUILD)/boot.o: $(SRC)/boot.s
+  mkdir -p $(BUILD)
+  $(NASM) -f elf32 $< -o $@
+
+$(BUILD)/vga_text.o: $(SRC)/vga_text.s
+  $(NASM) -f elf32 $< -o $@
+
+iso: $(BUILD)/$(TARGET)
+  mkdir -p $(ISO)/boot/grub
+  cp $(BUILD)/$(TARGET) $(ISO)/boot/$(TARGET)
+  cp $(SRC)/grub.cfg     $(ISO)/boot/grub/grub.cfg
+  grub-mkrescue -o umu.iso $(ISO)
+
+clean:
+  rm -rf $(BUILD) $(ISO) umu.iso
+
+
+GRUBメニュー(Cfg)
+• 　　src/grub.cfg
+
+set timeout=3
+set default=0
+
+menuentry "Umu Project (ASCII Art)" {
+  multiboot /boot/umu.bin
+  boot
+}
+
+
+実行テスト
+QEMUで起動確認
+• 　　コマンド:bash
+
+make
+qemu-system-x86_64 -cdrom umu.iso
+
+- 期待動作:
+GRUBメニューが表示 → 「Umu Project」を選択 → 80x25のテキスト画面に
+UmuのASCIIアートが描画されて止まる。
 
 
 
