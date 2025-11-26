@@ -51,6 +51,15 @@ umu/
 sudo apt update
 sudo apt install build-essential nasm xorriso grub-pc-bin grub-common
 
+インストールするソフトウェアの説明
+- build-essential → 開発環境の基盤（C/C++コンパイラやmake）※導入完了
+- nasm → アセンブリ言語を機械語に変換するアセンブラ         ※導入完了
+- xorriso → ISOイメージの作成・編集ツール                  ※導入完了
+- grub-pc-bin → BIOS環境用GRUBモジュール                  ※導入完了
+- grub-common → GRUB全般で共通利用されるツール群           ※導入完了
+
+
+
 最小のUmu本体（Multiboot＋VGA描画）
 Multibootヘッダとエントリ
 - src/boot.s
