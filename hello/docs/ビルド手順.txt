@@ -1,0 +1,16 @@
+# ディレクトリ作成
+mkdir -p build iso_root/boot/grub
+
+# アセンブル
+nasm -f elf32 src/boot.s -o build/boot.o
+nasm -f elf32 src/vga_text.s -o build/vga_text.o
+
+# リンク
+ld -m elf_i386 -T src/link.ld build/boot.o build/vga_text.o -o build/umu.bin
+
+# ISO作成
+cp build/umu.bin iso_root/boot/
+grub-mkrescue -o umu.iso iso_root
+
+# QEMU起動（BIOS版）
+qemu-system-x86_64 -cdrom umu.iso -serial mon:stdio
