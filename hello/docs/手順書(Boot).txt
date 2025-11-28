@@ -231,6 +231,42 @@ UmuのASCIIアートが描画されて止まる。
 手順書　完成版
 ＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃
 
+boot.sで完結する手順書（練習版）
+
+目的: GRUBやUEFIを使わず、boot.s単体で「Umu Project」を画面に表示する。
+
+コード作成
+src/boot.s にアセンブリで「Hello, Umu Project!」を表示する処理を書く
+BIOS割り込み（INT 0x10）を使うか、VGAテキストバッファ(0xB8000)に直接書き込む
+
+アセンブル
+nasm -f bin src/boot.s -o build/boot.bin
+
+512バイト以内に収める（MBR形式）
+ディスクイメージ作成
+dd if=build/boot.bin of=build/boot.img bs=512 count=1
+仮想ディスクの先頭にboot.binを書き込む
+
+起動テスト
+qemu-system-x86_64 -hda build/boot.img
+起動すると画面に「Umu Project」が表示される
+終了
+無限ループで停止する（HLT命令やジャンプで待機）
+
+📌 ポイント
+この手順書は boot.sだけで完結 するので、GRUBやISO作成は出てこない。
+「完成版」ではGRUBやMultibootを組み込むけど、その前にこの練習版をやることで
+「CPUが最初に実行するコード」を体感できる。
+これをやっておくと、後で「GRUBがやっていること」との対比が理解しやすくなる。
+
+
+
+
+
+
+
+本番
+
 電源投入から「Umu Project」が表示されるまでの流れ
 ① 電源投入とファームウェアの動作
 - 電源投入: CPUはリセットベクタから実行を開始し、マザーボード上のファームウェア（UEFIまたはBIOS互換）が動き出す。
