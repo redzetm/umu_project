@@ -14,3 +14,18 @@ grub-mkrescue -o umu.iso iso_root
 
 # QEMU起動（BIOS版）
 qemu-system-x86_64 -cdrom umu.iso -serial mon:stdio
+（テストしたらエラーだった。どうやらGUIが使えないと言っているようです
+起動オプションを下記に変更する。
+
+＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃
+
+# QEMU起動（SSH環境向け - cursesモード）
+qemu-system-x86_64 -cdrom umu.iso -curses
+
+# または nographic モード（シリアル出力のみ）
+# qemu-system-x86_64 -cdrom umu.iso -nographic
+
+# 終了方法: Ctrl+A → X (cursesモード) または Ctrl+A → C → quit (nographic)
+
+
+
