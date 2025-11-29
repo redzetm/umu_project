@@ -1,0 +1,259 @@
+Step1プロジェクト 実装手順書
+目次
+環境準備
+カーネルビルド
+initramfs 作成
+GRUB設定
+ブータブルイメージ作成
+QEMU検証
+トラブルシューティング
+
+＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃
+
+1. 環境準備
+1.1 必要なパッケージのインストール
+# 基本開発ツール
+sudo apt update
+sudo apt install -y build-essential bc bison flex libssl-dev \
+  libelf-dev libncurses-dev dwarves git wget
+
+# GRUB関連（UEFI対応）
+sudo apt install -y grub-efi-amd64-bin grub-common xorriso mtools
+
+# QEMU + OVMF（UEFI firmware）
+sudo apt install -y qemu-system-x86 ovmf
+
+# initramfs作成ツール
+sudo apt install -y cpio gzip dracut busybox-static
+
+
+ディレクトリ作成
+
+~/umu/step1/
+├── kernel/          # カーネルソースとビルド成果物
+├── initramfs/       # initramfs作成作業領域
+├── grub/            # GRUB設定ファイル
+├── iso_root/        # ISO作成用ルート
+│   └── boot/
+│       ├── grub/
+│       ├── vmlinuz
+│       └── initrd.img
+└── logs/            # 検証ログ保存場所
+
+2. カーネルビルド
+
+2.1 カーネルソース取得
+cd ~/umu/step1/kernel
+
+# Linux 6.x 最新版をダウンロード（例: 6.6.x LTS）
+wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.6.58.tar.xz
+tar -xf linux-6.6.58.tar.xz
+cd linux-6.6.58
+
+2.2 カーネル設定（.config作成）
+# デフォルト設定をベースに作成
+make defconfig
+
+# 必須設定を有効化（メニュー形式）
+make menuconfig
+
+
+必須設定項目:
+
+[*] 64-bit kernel
+    General setup --->
+        [*] Initial RAM filesystem and RAM disk (initramfs/initrd) support
+        [*] Support initial ramdisk/ramfs compressed using gzip
+    
+    Device Drivers --->
+        Generic Driver Options --->
+            [*] Maintain a devtmpfs filesystem to mount at /dev
+            [*] Automount devtmpfs at /dev
+        Block devices --->
+            <*> RAM block device support
+        SCSI device support --->
+            <*> SCSI disk support
+        Serial ATA and Parallel ATA drivers --->
+            <*> AHCI SATA support
+        Graphics support --->
+            Console display driver support --->
+                [*] Framebuffer Console support
+                [*] VGA text console
+    
+    File systems --->
+        <*> The Extended 4 (ext4) filesystem
+        <*> Btrfs filesystem (任意)
+        Pseudo filesystems --->
+            [*] /proc file system support
+            [*] sysfs file system support
+            [*] Tmpfs virtual memory file system support
+
+
+設定保存:
+# .config を保存
+cp .config ~/umu/step1/kernel/config-6.6.58-custom
+
+
+2.3 カーネルビルド
+
+# コア数に応じて並列ビルド（例: 8コア）
+make -j8
+
+# ビルド成果物を確認
+ls -lh arch/x86/boot/bzImage
+
+# 成果物をコピー
+cp arch/x86/boot/bzImage ~/umu/step1/iso_root/boot/vmlinuz-6.6.58-custom
+cp .config ~/umu/step1/iso_root/boot/config-6.6.58-custom
+
+※ビルド時間の目安: 10〜30分（環境による）
+
+
+3. initramfs 作成
+3.1 方法A: dracut を使う（推奨・簡単）
+
+cd ~/umu/step1/initramfs
+
+# カーネルモジュールディレクトリを準備
+sudo make -C ~/umu/step1/kernel/linux-6.6.58 modules_install \
+  INSTALL_MOD_PATH=$PWD/modules
+
+# dracut で initramfs 生成
+dracut --kver 6.6.58-custom \
+  --modules "bash base systemd systemd-initrd" \
+  --add-drivers "ahci sd_mod ext4" \
+  --force \
+  initrd.img-6.6.58-custom
+
+# 成果物をコピー
+cp initrd.img-6.6.58-custom ~/umu/step1/iso_root/boot/
+
+
+3.2 方法B: 手動作成（最小構成・学習向け）
+
+cd ~/umu/step1/initramfs
+mkdir -p rootfs/{bin,sbin,etc,proc,sys,dev,mnt/root}
+
+# busybox を配置
+cp /bin/busybox rootfs/bin/
+cd rootfs/bin
+for cmd in sh mount umount switch_root; do
+  ln -s busybox $cmd
+done
+cd ~/umu/step1/initramfs
+
+# init スクリプト作成
+cat > rootfs/init << 'EOF'
+#!/bin/sh
+mount -t proc none /proc
+mount -t sysfs none /sys
+mount -t devtmpfs none /dev
+
+# root パーティション検出（UUID指定の場合）
+ROOT_UUID="YOUR-ROOT-UUID"
+ROOT_DEV=$(blkid -U $ROOT_UUID)
+
+if [ -n "$ROOT_DEV" ]; then
+  mount -o ro $ROOT_DEV /mnt/root
+  umount /proc
+  umount /sys
+  umount /dev
+  exec switch_root /mnt/root /sbin/init
+else
+  echo "ERROR: Root device not found!"
+  exec /bin/sh
+fi
+EOF
+
+chmod +x rootfs/init
+
+# cpio アーカイブ作成
+cd rootfs
+find . | cpio -o -H newc | gzip > ../../iso_root/boot/initrd.img-6.6.58-custom
+cd ~/umu/step1
+
+
+initramfs 中身リスト保存:
+
+mkdir -p ~/umu/step1/initramfs/extracted
+cd ~/umu/step1/initramfs/extracted
+gunzip < ~/umu/step1/iso_root/boot/initrd.img-6.6.58-custom | cpio -idmv > ../initramfs-contents.txt
+
+
+4. GRUB設定
+4.1 grub.cfg 作成
+
+mkdir -p ~/umu/step1/iso_root/boot/grub
+
+cat > ~/umu/step1/iso_root/boot/grub/grub.cfg << 'EOF'
+set timeout=10
+set default=0
+
+menuentry "Custom Linux 6.6.58 (UEFI)" {
+  insmod gzio
+  insmod part_gpt
+  insmod ext2
+  
+  linux /boot/vmlinuz-6.6.58-custom root=UUID=REPLACE-WITH-YOUR-UUID ro console=tty1 console=ttyS0,115200
+  initrd /boot/initrd.img-6.6.58-custom
+}
+
+menuentry "Custom Linux 6.6.58 (Debug Mode)" {
+  insmod gzio
+  insmod part_gpt
+  insmod ext2
+  
+  linux /boot/vmlinuz-6.6.58-custom root=UUID=REPLACE-WITH-YOUR-UUID ro console=tty1 console=ttyS0,115200 debug loglevel=7
+  initrd /boot/initrd.img-6.6.58-custom
+}
+EOF
+
+
+UUID の取得方法（実機/VM ディスクがある場合）:
+
+# ルートパーティションの UUID 確認
+sudo blkid | grep 'TYPE="ext4"'
+# 出力例: /dev/sda2: UUID="a1b2c3d4-..." TYPE="ext4"
+
+# grub.cfg 内の REPLACE-WITH-YOUR-UUID を実際の UUID に置換
+sed -i 's/REPLACE-WITH-YOUR-UUID/a1b2c3d4-.../g' ~/umu/step1/iso_root/boot/grub/grub.cfg
+
+
+5. ブータブルイメージ作成
+5.1 ISO イメージ作成（UEFI対応）
+
+cd ~/umu/step1
+
+# GRUB EFI ブートローダーを含む ISO 作成
+grub-mkrescue -o step1-boot.iso iso_root
+
+
+5.2 ISO 内容確認
+
+# ISO の中身を確認
+isoinfo -i step1-boot.iso -l | less
+
+# 特に以下が存在するか確認
+isoinfo -i step1-boot.iso -l | grep -E '(vmlinuz|initrd|grub.cfg|BOOTX64.EFI)'
+
+
+6. QEMU検証
+6.1 UEFI（OVMF）での起動テスト
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
