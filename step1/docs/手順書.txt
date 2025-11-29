@@ -1,4 +1,5 @@
 Step1プロジェクト 実装手順書
+
 目次
 環境準備
 カーネルビルド
@@ -240,18 +241,132 @@ isoinfo -i step1-boot.iso -l | grep -E '(vmlinuz|initrd|grub.cfg|BOOTX64.EFI)'
 6. QEMU検証
 6.1 UEFI（OVMF）での起動テスト
 
+cd ~/umu/step1
+
+# OVMF パスを確認
+OVMF_CODE=/usr/share/OVMF/OVMF_CODE.fd
+OVMF_VARS=/usr/share/OVMF/OVMF_VARS.fd
+
+# OVMF 変数用コピー作成（書き込み可能に）
+cp $OVMF_VARS OVMF_VARS_custom.fd
+
+# QEMU 起動（シリアルログ保存）
+qemu-system-x86_64 \
+  -enable-kvm \
+  -m 2048 \
+  -cdrom step1-boot.iso \
+  -drive if=pflash,format=raw,readonly=on,file=$OVMF_CODE \
+  -drive if=pflash,format=raw,file=OVMF_VARS_custom.fd \
+  -serial file:logs/serial-$(date +%Y%m%d-%H%M%S).log \
+  -nographic
+
+終了方法: Ctrl + A → C → quit → Enter
+
+
+6.2 期待される動作
+GRUB メニュー表示 (10秒)
+タイムアウト後に自動起動 (デフォルトエントリ)
+カーネル起動ログ (dmesg 相当が表示される)
+initramfs 実行 (switch_root まで)
+ログインプロンプト表示
+
+Welcome to Custom Linux 6.6.58
+
+localhost login: _
 
 
 
 
+7. トラブルシューティング
+7.1 GRUB メニューが表示されない
+症状: QEMU が起動するが GRUB が出ない
+
+確認:
+# ISO 内の EFI ファイル確認
+isoinfo -i step1-boot.iso -l | grep -i 'efi/boot'
+
+# 手動マウントして確認
+mkdir -p /tmp/iso_check
+sudo mount -o loop step1-boot.iso /tmp/iso_check
+ls -la /tmp/iso_check/EFI/BOOT/
+sudo umount /tmp/iso_check
+
+
+対処:
+grub-mkrescue 再実行
+grub-efi-amd64-bin が正しくインストールされているか確認
+
+
+7.2 カーネルパニック（Kernel Panic）
+症状: initramfs 後に "Kernel panic - not syncing: VFS: Unable to mount root fs"
+
+原因: root= 指定が間違っている / initramfs に必要なドライバがない
+
+対処:
+# UUID 確認
+sudo blkid
+
+# initramfs にドライバを追加（dracut の場合）
+dracut --add-drivers "ahci sd_mod ext4 virtio_blk virtio_scsi" --force initrd.img-6.6.58-custom
+
+# ISO 再作成
+cp initrd.img-6.6.58-custom ~/umu/step1/iso_root/boot/
+grub-mkrescue -o step1-boot.iso iso_root
+
+
+7.3 ログインプロンプトが出ない
+症状: カーネルは起動するが getty が動かない
+
+確認:
+# initramfs の init スクリプトを確認
+cd ~/umu/step1/initramfs/extracted
+cat init
+
+# systemd の場合は systemctl コマンドで確認（起動後）
+systemctl status getty@tty1
+
+対処:
+init スクリプトで init が正しく呼ばれているか
+systemd を使う場合は initramfs に systemd-initrd を含める
+
+
+7.4 シリアルログが空
+症状: logs/ 内のファイルが空またはサイズ0
+
+対処:
+# -nographic を外してグラフィカルモードで確認
+qemu-system-x86_64 \
+  -enable-kvm \
+  -m 2048 \
+  -cdrom step1-boot.iso \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
+  -serial mon:stdio
 
 
 
+8. 成功条件チェックリスト
+ GRUB メニューが表示される
+ timeout（10秒）経過後に自動起動する
+ カーネルが initramfs をロードする
+ switch_root に成功する
+ ログインプロンプトが表示される
+ logs/serial-*.log にエラーがない
+ 手動選択（Enter）でも起動できる
+ 3回連続で再現性がある
 
 
 
+ 9. 成果物一覧
 
-
+~/umu/step1/
+├── kernel/config-6.6.58-custom       # カーネル設定
+├── iso_root/boot/
+│   ├── vmlinuz-6.6.58-custom         # カーネルイメージ
+│   ├── initrd.img-6.6.58-custom      # initramfs
+│   └── grub/grub.cfg                 # GRUB設定
+├── step1-boot.iso                    # 検証用ISO
+├── logs/serial-*.log                 # 起動ログ
+└── initramfs/initramfs-contents.txt  # initramfs中身リスト
 
 
 
