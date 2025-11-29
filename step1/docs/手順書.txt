@@ -27,7 +27,7 @@ sudo apt install -y qemu-system-x86 ovmf
 # initramfs作成ツール
 sudo apt install -y cpio gzip dracut busybox-static
 
-
+＃＃＃＃＃＃　　ここまではOK　　＃＃＃＃＃＃
 ディレクトリ作成
 
 ~/umu/step1/
