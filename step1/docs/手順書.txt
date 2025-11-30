@@ -75,6 +75,9 @@ make kernelrelease
 # 設定保存
 cp .config ~/umu/step1/kernel/config-6.6.58
 
+
+＃＃＃＃＃　今回はやらない　＃＃＃＃＃
+
 # 必須設定を有効化（メニュー形式）
 # ※今回はdefconfigベースで進めるが、カスタマイズする場合は以下を実行
 make menuconfig
@@ -113,6 +116,7 @@ make menuconfig
 # 設定保存
 cp .config ~/umu/step1/kernel/config-6.6.58-custom
 
+＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃
 
 2.3 カーネルビルド
 
