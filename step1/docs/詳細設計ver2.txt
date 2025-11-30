@@ -62,6 +62,8 @@ cp arch/x86/boot/bzImage ~/umu/step1/iso_root/boot/vmlinuz-6.6.58
 cp .config ~/umu/step1/iso_root/boot/config-6.6.58
 
 
+＃＃＃＃＃＃＃＃＃　　一旦ここまでOK　　＃＃＃＃＃＃＃＃＃
+
 ## 3. initramfs（busybox版）作成
 
 ### 3.1 構造作成
@@ -77,8 +79,72 @@ done
 cd ~/umu/step1/initramfs
 
 
+### 3.2 initスクリプト作成
+
+sh
+// filepath: ~/umu/step1/initramfs/rootfs/init
+#!/bin/sh
+mount -t proc none /proc
+mount -t sysfs none /sys
+mount -t devtmpfs none /dev
+echo "Umu Project Emergency Shell"
+exec /bin/sh
 
 
+chmod +x rootfs/init
+
+
+3.3 cpioアーカイブ作成
+
+cd rootfs
+find . | cpio -o -H newc | gzip > ../initrd.img-6.6.58
+cd ..
+cp initrd.img-6.6.58 ../iso_root/boot/
+
+
+
+4. GRUB設定
+
+// filepath: ~/umu/step1/iso_root/boot/grub/grub.cfg
+set timeout=10
+set default=0
+
+menuentry "Umu Project Linux 6.6.58" {
+  linux /boot/vmlinuz-6.6.58 ro console=tty1 console=ttyS0,115200
+  initrd /boot/initrd.img-6.6.58
+}
+
+
+5. ISOイメージ作成
+
+cd ~/umu/step1
+grub-mkrescue -o step1-boot.iso iso_root
+
+
+6. QEMU検証
+
+cd ~/umu/step1
+qemu-system-x86_64 \
+  -enable-kvm \
+  -m 2048 \
+  -cdrom step1-boot.iso \
+  -serial file:logs/serial.log \
+  -nographic
+
+
+
+7. 成功条件
+
+GRUBメニューが表示される
+カーネルが起動し、initramfsのシェルが表示される
+シェルで ls / や cat /proc/cmdline などが動作する
+
+
+8. トラブルシューティング
+
+GRUBが表示されない → ISO作成手順・GRUB設定を再確認
+シェルが出ない → initramfsの構成・initスクリプトを再確認
+コマンドが動かない → busyboxリンク・initramfs構成を再確認
 
 
 
