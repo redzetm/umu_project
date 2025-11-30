@@ -62,7 +62,19 @@ cp arch/x86/boot/bzImage ~/umu/step1/iso_root/boot/vmlinuz-6.6.58
 cp .config ~/umu/step1/iso_root/boot/config-6.6.58
 
 
+## 3. initramfs（busybox版）作成
 
+### 3.1 構造作成
+
+bash
+cd ~/umu/step1/initramfs
+mkdir -p rootfs/{bin,sbin,etc,proc,sys,dev}
+cp /usr/bin/busybox rootfs/bin/
+cd rootfs/bin
+for cmd in sh mount umount ls cat mkdir cp mv rm chmod ln chown grep sed; do
+  ln -s busybox $cmd
+done
+cd ~/umu/step1/initramfs
 
 
 
