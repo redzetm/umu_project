@@ -1,0 +1,105 @@
+# 1. 環境準備
+
+### 1.1 必要パッケージのインストール
+
+bash
+
+sudo apt update
+sudo apt install -y build-essential bc bison flex libssl-dev \
+  libelf-dev libncurses-dev dwarves git wget \
+  grub-efi-amd64-bin grub-common xorriso mtools \
+  qemu-system-x86 ovmf \
+  cpio gzip busybox-static
+
+
+### 1.2 ディレクトリ作成
+
+bash
+mkdir -p ~/umu/step1/{kernel,initramfs,iso_root/boot/grub,logs}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
