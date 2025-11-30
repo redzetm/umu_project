@@ -190,7 +190,7 @@ cd ~/umu/step1/initramfs
 
 ### 3.2 initスクリプト作成
 
-`sh
+sh
 // filepath: ~/umu/step1/initramfs/rootfs/init
 #!/bin/sh
 mount -t proc none /proc
@@ -255,6 +255,6 @@ GRUBが表示されない → ISO作成手順・GRUB設定を再確認
 シェルが出ない → initramfsの構成・initスクリプトを再確認
 コマンドが動かない → busyboxリンク・initramfs構成を再確認
 
-
+＃＃＃＃＃＃＃＃＃　　一旦ここまで　　＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃
 
 
