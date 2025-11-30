@@ -241,7 +241,7 @@ initramfs 中身リスト保存:
 
 mkdir -p ~/umu/step1/initramfs/extracted
 cd ~/umu/step1/initramfs/extracted
-gunzip < ~/umu/step1/iso_root/boot/initrd.img-6.6.58-custom | cpio -idmv > ../initramfs-contents.txt
+gunzip < ~/umu/step1/iso_root/boot/initrd.img-6.6.58 | cpio -idmv > ../initramfs-contents.txt
 
 
 
