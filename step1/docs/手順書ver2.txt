@@ -1,0 +1,28 @@
+Step1プロジェクト 実装手順書
+
+目次
+環境準備
+カーネルビルド
+initramfs 作成
+GRUB設定
+ブータブルイメージ作成
+QEMU検証
+トラブルシューティング
+
+＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃
+
+1. 環境準備
+1.1 必要なパッケージのインストール
+# 基本開発ツール
+sudo apt update
+sudo apt install -y build-essential bc bison flex libssl-dev \
+  libelf-dev libncurses-dev dwarves git wget
+
+# GRUB関連（UEFI対応）
+sudo apt install -y grub-efi-amd64-bin grub-common xorriso mtools
+
+# QEMU + OVMF（UEFI firmware）
+sudo apt install -y qemu-system-x86 ovmf
+
+# initramfs作成ツール
+sudo apt install -y cpio gzip dracut busybox-static
