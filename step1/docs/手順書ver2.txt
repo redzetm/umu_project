@@ -109,6 +109,12 @@ make olddefconfig の説明なし
 
 # Step1プロジェクト 実装手順書（新規・最小構成版）
 
+- 目的に直結 →          「最小限のカーネル＋BusyBox initramfsでQEMU起動確認」になっている
+- 構成がシンプル →       BusyBox採用で systemd 問題を回避
+- 成果物が明示 →         bzImage, initrd.img, grub.cfg, ISO が揃う
+- 成功条件が明確 →       GRUB表示 → カーネル起動 → シェル操作
+
+
 ---
 
 ## 1. 環境準備
@@ -248,35 +254,6 @@ GRUBメニューが表示される
 GRUBが表示されない → ISO作成手順・GRUB設定を再確認
 シェルが出ない → initramfsの構成・initスクリプトを再確認
 コマンドが動かない → busyboxリンク・initramfs構成を再確認
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
