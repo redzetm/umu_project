@@ -47,6 +47,19 @@ make defconfig          #コンフィグレーション生成
 cp .config ../config-6.6.58
 
 
+### 2.3 ビルド
+
+bash
+make -j$(nproc)
+
+# カーネルモジュールもビルド（今回はこの工程は無しとする）
+make modules -j$(nproc)
+
+### 2.4 成果物コピー
+
+bash
+cp arch/x86/boot/bzImage ~/umu/step1/iso_root/boot/vmlinuz-6.6.58
+cp .config ~/umu/step1/iso_root/boot/config-6.6.58
 
 
 
