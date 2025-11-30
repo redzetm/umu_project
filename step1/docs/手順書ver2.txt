@@ -121,20 +121,20 @@ make olddefconfig の説明なし
 
 ### 1.1 必要パッケージのインストール
 
-```bash
+bash
 sudo apt update
 sudo apt install -y build-essential bc bison flex libssl-dev \
   libelf-dev libncurses-dev dwarves git wget \
   grub-efi-amd64-bin grub-common xorriso mtools \
   qemu-system-x86 ovmf \
   cpio gzip busybox-static
-```
+
 
 ### 1.2 ディレクトリ作成
 
-```bash
+bash
 mkdir -p ~/umu/step1/{kernel,initramfs,iso_root/boot/grub,logs}
-```
+
 
 ---
 
@@ -142,34 +142,34 @@ mkdir -p ~/umu/step1/{kernel,initramfs,iso_root/boot/grub,logs}
 
 ### 2.1 ソース取得
 
-```bash
+bash
 cd ~/umu/step1/kernel
 wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.6.58.tar.xz
 tar -xf linux-6.6.58.tar.xz
 cd linux-6.6.58
-```
+
 
 ### 2.2 カーネル設定
 
-```bash
+bash
 make mrproper
 make defconfig
 # 必要なら make menuconfig でカスタマイズ
 cp .config ../config-6.6.58
-```
+
 
 ### 2.3 ビルド
 
-```bash
+bash
 make -j$(nproc)
-```
+
 
 ### 2.4 成果物コピー
 
-```bash
+bash
 cp arch/x86/boot/bzImage ~/umu/step1/iso_root/boot/vmlinuz-6.6.58
 cp .config ~/umu/step1/iso_root/boot/config-6.6.58
-```
+
 
 ---
 
@@ -177,7 +177,7 @@ cp .config ~/umu/step1/iso_root/boot/config-6.6.58
 
 ### 3.1 構造作成
 
-```bash
+bash
 cd ~/umu/step1/initramfs
 mkdir -p rootfs/{bin,sbin,etc,proc,sys,dev}
 cp /usr/bin/busybox rootfs/bin/
@@ -186,11 +186,11 @@ for cmd in sh mount umount ls cat mkdir cp mv rm chmod ln chown grep sed; do
   ln -s busybox $cmd
 done
 cd ~/umu/step1/initramfs
-```
+
 
 ### 3.2 initスクリプト作成
 
-````sh
+`sh
 // filepath: ~/umu/step1/initramfs/rootfs/init
 #!/bin/sh
 mount -t proc none /proc
