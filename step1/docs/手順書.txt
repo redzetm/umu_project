@@ -53,21 +53,33 @@ wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.6.58.tar.xz
 tar -xf linux-6.6.58.tar.xz
 cd linux-6.6.58
 
-2.2 カーネル設定（.config作成）※make defconfigかmake memu configを実施
+2.2 カーネル設定（.config作成）※make defconfigかmake memuconfigを実施
                                最初はdefconfigでデフォルト構成が無難と思った
                                カスタムするときは、memuconfigでいいかな。
+2.2 カーネル設定（.config作成）
+
 # デフォルト設定をベースに作成
 make defconfig
 
+# カスタムバージョン文字列を追加
+echo 'CONFIG_LOCALVERSION="-custom"' >> .config
+make olddefconfig
+
+# 設定を確認
+make kernelrelease
+# 出力: 6.6.58-custom ← これが正しいことを確認
+
 # 必須設定を有効化（メニュー形式）
+# ※今回はdefconfigベースで進めるが、カスタマイズする場合は以下を実行
 make menuconfig
 
-必須設定項目:
+必須設定項目（参考）:
 
 [*] 64-bit kernel
     General setup --->
         [*] Initial RAM filesystem and RAM disk (initramfs/initrd) support
         [*] Support initial ramdisk/ramfs compressed using gzip
+        (-custom) Local version - append to kernel release  ← 既に設定済み
     
     Device Drivers --->
         Generic Driver Options --->
@@ -92,10 +104,7 @@ make menuconfig
             [*] sysfs file system support
             [*] Tmpfs virtual memory file system support
 
-
-設定保存:
-# .config を保存（.configがカレントDirに生成されるからcpで.configをconfig-6.6.58-customと
-　して一旦保存する）
+# 設定保存
 cp .config ~/umu/step1/kernel/config-6.6.58-custom
 
 
@@ -132,13 +141,14 @@ cd ~/umu/step1/initramfs
 sudo make -C ~/umu/step1/kernel/linux-6.6.58 modules_install \
   INSTALL_MOD_PATH=$PWD/modules
 
-# dracut で initramfs 生成（coreutils を使用、busybox を除外）
+# dracut で initramfs 生成（systemd を完全除外）
 dracut --kver 6.6.58-custom \
   --kmoddir $PWD/modules/lib/modules/6.6.58-custom \
-  --modules "bash systemd systemd-initrd" \
-  --omit busybox \
-  --install "/usr/bin/mount /usr/bin/umount /usr/bin/cp /usr/bin/mv /usr/bin/mkdir /usr/bin/cat /usr/bin/ls /usr/bin/chmod /usr/bin/ln /usr/bin/rm /usr/bin/chown /usr/bin/grep /usr/bin/sed" \
-  --add-drivers "ahci sd_mod ext4 virtio_blk virtio_scsi" \
+  --no-hostonly \
+  --omit "systemd systemd-initrd busybox plymouth" \
+  --add "bash drm" \
+  --install "/usr/bin/bash /usr/bin/mount /usr/bin/umount /usr/bin/cp /usr/bin/mv /usr/bin/mkdir /usr/bin/cat /usr/bin/ls /usr/bin/chmod /usr/bin/ln /usr/bin/rm /usr/bin/chown /usr/bin/grep /usr/bin/sed" \
+  --add-drivers "ahci sd_mod ext4 virtio_blk virtio_scsi virtio_pci" \
   --force \
   initrd.img-6.6.58-custom
 
@@ -146,14 +156,20 @@ dracut --kver 6.6.58-custom \
 cp initrd.img-6.6.58-custom ~/umu/step1/iso_root/boot/
 
 # 補足説明:
-# --omit busybox      : busybox を除外
-# --install "/usr/bin/..." : coreutils のコマンドを明示的に含める
-# --add-drivers に virtio_blk, virtio_scsi を追加（QEMU/KVM 用）
+# --no-hostonly              : ホスト固有の設定を含めない（汎用性向上）
+# --omit "systemd..."        : systemd/busybox/plymouth を除外
+# --add "bash drm"           : bash とグラフィックドライバを追加
+# --install "/usr/bin/..."   : coreutils のコマンドを明示的に含める
+# --add-drivers              : QEMU/KVM 用ドライバ（virtio_pci を追加）
 
-# initramfs の中身を確認（coreutils が使われているか検証）
+# initramfs の中身を確認（systemd が除外されているか検証）
 mkdir -p ~/umu/step1/initramfs/extracted
 cd ~/umu/step1/initramfs/extracted
 gunzip < ~/umu/step1/iso_root/boot/initrd.img-6.6.58-custom | cpio -idmv > ../initramfs-contents.txt
+
+# systemd が除外されているか確認
+find . -name "*systemd*" | wc -l
+# 出力が 0 であることを確認（systemd が含まれていない）
 
 # コマンドの実体を確認（coreutils か busybox かを判定）
 file usr/bin/ls usr/bin/cp usr/bin/mount
@@ -162,7 +178,8 @@ file usr/bin/ls usr/bin/cp usr/bin/mount
 
 # サイズ確認
 du -sh .
-# coreutils 版: 約 50-100MB
+# systemd なし coreutils 版: 約 30-50MB
+# systemd あり coreutils 版: 約 80-120MB
 # busybox 版: 約 10-20MB
 
 
@@ -220,6 +237,7 @@ cd ~/umu/step1/initramfs/extracted
 gunzip < ~/umu/step1/iso_root/boot/initrd.img-6.6.58-custom | cpio -idmv > ../initramfs-contents.txt
 
 
+
 4. GRUB設定
 4.1 grub.cfg 作成
 
@@ -234,7 +252,8 @@ menuentry "Umu Project - Custom Linux 6.6.58 (Normal Mode)" {
   insmod part_gpt
   insmod ext2
   
-  linux /boot/vmlinuz-6.6.58-custom ro console=tty1 console=ttyS0,115200
+  # rd.shell を追加: エラー時に緊急シェルを起動
+  linux /boot/vmlinuz-6.6.58-custom ro console=tty1 console=ttyS0,115200 rd.shell
   initrd /boot/initrd.img-6.6.58-custom
 }
 
@@ -243,10 +262,16 @@ menuentry "Umu Project - Custom Linux 6.6.58 (Debug Mode)" {
   insmod part_gpt
   insmod ext2
   
-  linux /boot/vmlinuz-6.6.58-custom ro console=tty1 console=ttyS0,115200 debug loglevel=7
+  # rd.debug を追加: dracut のデバッグログを有効化
+  linux /boot/vmlinuz-6.6.58-custom ro console=tty1 console=ttyS0,115200 debug loglevel=7 rd.debug rd.shell
   initrd /boot/initrd.img-6.6.58-custom
 }
 EOF
+
+# 補足説明:
+# rd.shell  : ルートデバイスが見つからない場合に緊急シェルを起動
+# rd.debug  : dracut の詳細ログを出力（デバッグモードのみ）
+
 
 
 UUID の取得方法（実機/VM ディスクがある場合）:
@@ -282,6 +307,9 @@ isoinfo -i step1-boot.iso -l | grep -E '(vmlinuz|initrd|grub.cfg|BOOTX64.EFI)'
 
 cd ~/umu/step1
 
+# ログディレクトリを作成（存在しない場合）
+mkdir -p logs
+
 # OVMF パスを確認
 OVMF_CODE=/usr/share/OVMF/OVMF_CODE.fd
 OVMF_VARS=/usr/share/OVMF/OVMF_VARS.fd
@@ -302,16 +330,35 @@ qemu-system-x86_64 \
 終了方法: Ctrl + A → C → quit → Enter
 
 
+
 6.2 期待される動作
-GRUB メニュー表示 (10秒)
-タイムアウト後に自動起動 (デフォルトエントリ)
-カーネル起動ログ (dmesg 相当が表示される)
-initramfs 実行 (switch_root まで)
-ログインプロンプト表示
+✅ GRUB メニュー表示 (10秒)
+✅ タイムアウト後に自動起動 (デフォルトエントリ)
+✅ カーネル起動ログ (dmesg 相当が表示される)
+✅ initramfs 実行
+✅ 緊急シェルプロンプトが表示される
 
-Welcome to Custom Linux 6.6.58
+期待される出力例:
 
-localhost login: _
+[    0.000000] Linux version 6.6.58-custom (root@hostname) ...
+[    0.123456] Command line: ro console=tty1 console=ttyS0,115200 rd.shell
+[    0.234567] Kernel command line: ro console=tty1 console=ttyS0,115200 rd.shell
+[    1.234567] dracut: Mounted root filesystem /dev/root
+[    1.345678] dracut: Switching root
+[    2.123456] dracut: No root device specified or root device not found
+[    2.234567] dracut: Dropping to debug shell.
+
+dracut:/# _  ← ここで緊急シェルプロンプトが出れば成功
+
+注意事項:
+- ISO 起動環境では、永続的なルートファイルシステムがないため、
+  systemd のログインプロンプトは表示されません
+- initramfs の緊急シェル (dracut:/#) が起動すれば成功です
+- シェル内で以下のコマンドが動作することを確認してください:
+  dracut:/# ls /
+  dracut:/# cat /proc/cmdline
+  dracut:/# mount | grep -E '(proc|sys|dev)'
+  dracut:/# lsmod
 
 
 
@@ -353,20 +400,71 @@ cp initrd.img-6.6.58-custom ~/umu/step1/iso_root/boot/
 grub-mkrescue -o step1-boot.iso iso_root
 
 
-7.3 ログインプロンプトが出ない
-症状: カーネルは起動するが getty が動かない
 
-確認:
-# initramfs の init スクリプトを確認
+7.3 緊急シェルプロンプトが出ない
+症状: カーネルは起動するが dracut のシェルが表示されない
+
+確認手順:
+
+1. シリアルログを確認
+cd ~/umu/step1/logs
+cat serial-*.log | grep -E "(dracut|Kernel panic|systemd)"
+
+2. initramfs の中身を確認
 cd ~/umu/step1/initramfs/extracted
-cat init
 
-# systemd の場合は systemctl コマンドで確認（起動後）
-systemctl status getty@tty1
+# init スクリプトが存在するか
+ls -la init
+# 出力例: -rwxr-xr-x 1 root root 12345 ... init
 
-対処:
-init スクリプトで init が正しく呼ばれているか
-systemd を使う場合は initramfs に systemd-initrd を含める
+# systemd が除外されているか確認
+find . -name "*systemd*" | wc -l
+# 出力が 0 であることを確認（systemd が含まれていない）
+
+# dracut モジュールが正しいか確認
+ls -la usr/lib/dracut/modules.d/
+# 90kernel-modules/, 99base/ などが存在することを確認
+
+3. カーネルパラメータを確認
+# ISO を QEMU で起動し、GRUB メニューで 'e' を押して編集
+# linux /boot/vmlinuz... の行に rd.shell が含まれているか確認
+
+対処方法:
+
+# dracut を再実行（systemd を明示的に除外）
+cd ~/umu/step1/initramfs
+dracut --kver 6.6.58-custom \
+  --kmoddir $PWD/modules/lib/modules/6.6.58-custom \
+  --no-hostonly \
+  --omit "systemd systemd-initrd busybox plymouth" \
+  --add "bash drm" \
+  --install "/usr/bin/bash /usr/bin/mount /usr/bin/umount /usr/bin/ls /usr/bin/cat /usr/bin/mkdir /usr/bin/cp /usr/bin/mv /usr/bin/chmod /usr/bin/ln /usr/bin/rm /usr/bin/chown /usr/bin/grep /usr/bin/sed" \
+  --add-drivers "ahci sd_mod ext4 virtio_blk virtio_scsi virtio_pci" \
+  --force \
+  initrd.img-6.6.58-custom
+
+# 成果物をコピー
+cp initrd.img-6.6.58-custom ~/umu/step1/iso_root/boot/
+
+# grub.cfg に rd.shell が含まれているか確認
+cat ~/umu/step1/iso_root/boot/grub/grub.cfg | grep rd.shell
+# 出力例: linux /boot/vmlinuz-6.6.58-custom ro console=tty1 console=ttyS0,115200 rd.shell
+
+# ISO 再作成
+cd ~/umu/step1
+grub-mkrescue -o step1-boot.iso iso_root
+
+# QEMU で再テスト
+mkdir -p logs
+qemu-system-x86_64 \
+  -enable-kvm \
+  -m 2048 \
+  -cdrom step1-boot.iso \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
+  -drive if=pflash,format=raw,file=OVMF_VARS_custom.fd \
+  -serial file:logs/serial-$(date +%Y%m%d-%H%M%S).log \
+  -nographic
+
 
 
 7.4 シリアルログが空
@@ -383,29 +481,81 @@ qemu-system-x86_64 \
 
 
 
+
 8. 成功条件チェックリスト
- GRUB メニューが表示される
- timeout（10秒）経過後に自動起動する
- カーネルが initramfs をロードする
- switch_root に成功する
- ログインプロンプトが表示される
- logs/serial-*.log にエラーがない
- 手動選択（Enter）でも起動できる
- 3回連続で再現性がある
+ ✅ GRUB メニューが表示される
+ ✅ timeout（10秒）経過後に自動起動する
+ ✅ カーネルが initramfs をロードする
+ ✅ dracut の init スクリプトが実行される
+ ✅ 緊急シェルプロンプト (dracut:/#) が表示される
+ ✅ logs/serial-*.log にカーネルパニックがない
+ ✅ シェルで基本コマンド (ls, cat, mount) が動作する
+ ✅ 手動選択（Enter）でも起動できる
+ ✅ 3回連続で再現性がある
+
+注意事項:
+- systemd を除外したため、ログインプロンプト (localhost login:) は表示されません
+- 緊急シェル (dracut:/#) が起動すれば成功です
+- シェル内で以下のコマンドが動作することを確認してください:
+
+  dracut:/# ls /
+  bin  dev  etc  init  lib  lib64  proc  root  run  sbin  sys  tmp  usr  var
+
+  dracut:/# cat /proc/cmdline
+  ro console=tty1 console=ttyS0,115200 rd.shell
+
+  dracut:/# mount | grep -E '(proc|sys|dev)'
+  proc on /proc type proc (rw,relatime)
+  sysfs on /sys type sysfs (rw,relatime)
+  devtmpfs on /dev type devtmpfs (rw,relatime,size=...)
+
+  dracut:/# lsmod | head -5
+  Module                  Size  Used by
+  virtio_scsi            20480  0
+  virtio_blk             20480  0
+  ext4                  786432  0
+  ...
+
+  dracut:/# file /usr/bin/ls
+  /usr/bin/ls: ELF 64-bit LSB pie executable, x86-64 ...
+
+- ISO 起動環境では root デバイスがないため、これ以上先に進むことはできません
+- この状態で「成功」と判断してください
 
 
 
  9. 成果物一覧
 
 ~/umu/step1/
-├── kernel/config-6.6.58-custom       # カーネル設定
-├── iso_root/boot/
-│   ├── vmlinuz-6.6.58-custom         # カーネルイメージ
-│   ├── initrd.img-6.6.58-custom      # initramfs
-│   └── grub/grub.cfg                 # GRUB設定
-├── step1-boot.iso                    # 検証用ISO
-├── logs/serial-*.log                 # 起動ログ
-└── initramfs/initramfs-contents.txt  # initramfs中身リスト
+├── kernel/
+│   ├── linux-6.6.58/                 # カーネルソースツリー
+│   │   ├── .config                   # ビルド時の設定
+│   │   └── arch/x86/boot/bzImage     # カーネルイメージ（ビルド成果物）
+│   ├── linux-6.6.58.tar.xz           # ダウンロードしたアーカイブ
+│   └── config-6.6.58-custom          # 保存した設定（バックアップ）
+├── initramfs/
+│   ├── modules/                      # カーネルモジュール（一時ディレクトリ）
+│   │   └── lib/modules/6.6.58-custom/
+│   ├── extracted/                    # initramfs 展開内容（検証用）
+│   ├── initramfs-contents.txt        # initramfs ファイルリスト
+│   └── initrd.img-6.6.58-custom      # 生成された initramfs
+├── iso_root/
+│   └── boot/
+│       ├── vmlinuz-6.6.58-custom     # カーネルイメージ（コピー）
+│       ├── initrd.img-6.6.58-custom  # initramfs（コピー）
+│       ├── config-6.6.58-custom      # カーネル設定（コピー）
+│       └── grub/
+│           └── grub.cfg              # GRUB メニュー設定
+├── logs/
+│   └── serial-YYYYMMDD-HHMMSS.log    # QEMU 起動ログ（複数）
+├── step1-boot.iso                    # 最終成果物（ブータブルISO）
+└── OVMF_VARS_custom.fd               # UEFI 変数（テスト用、書き込み可能）
+
+重要な成果物:
+- step1-boot.iso: QEMU で直接起動可能な ISO イメージ
+- logs/serial-*.log: 起動ログ（トラブルシューティング用）
+- kernel/config-6.6.58-custom: カーネルビルド設定（再現性確保）
+- initramfs/initramfs-contents.txt: initramfs の内容一覧
 
 
 
