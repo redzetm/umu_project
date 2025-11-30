@@ -41,7 +41,6 @@ sudo apt install -y cpio gzip dracut busybox-static
 │       └── initrd.img
 └── logs/            # 検証ログ保存場所
 
-＃＃＃＃＃＃　　ここまではOK　　＃＃＃＃＃＃
 
 2. カーネルビルド
 
