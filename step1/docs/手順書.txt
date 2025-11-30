@@ -58,16 +58,23 @@ cd linux-6.6.58
                                カスタムするときは、memuconfigでいいかな。
 2.2 カーネル設定（.config作成）
 
+cd ~/umu/step1/kernel/linux-6.6.58
+
+# 念のため完全にクリーンアップ
+make mrproper
+
 # デフォルト設定をベースに作成
 make defconfig
 
-# カスタムバージョン文字列を追加
-echo 'CONFIG_LOCALVERSION="-custom"' >> .config
-make olddefconfig
-
 # 設定を確認
 make kernelrelease
-# 出力: 6.6.58-custom ← これが正しいことを確認
+# 出力: 6.6.58 ← このまま進める
+
+# 必須設定を有効化（任意・カスタマイズする場合）
+# make menuconfig
+
+# 設定保存
+cp .config ~/umu/step1/kernel/config-6.6.58
 
 # 必須設定を有効化（メニュー形式）
 # ※今回はdefconfigベースで進めるが、カスタマイズする場合は以下を実行
@@ -110,30 +117,26 @@ cp .config ~/umu/step1/kernel/config-6.6.58-custom
 
 2.3 カーネルビルド
 
-# コア数に応じて並列ビルド（例: 8コア）※今回の仮想環境の場合4コア
-#make -j8　※　make -j4 でいくかーー
+cd ~/umu/step1/kernel/linux-6.6.58
 
-一番良いのは
 # コア数を自動検出して並列ビルド
 make -j$(nproc)
 
 # カーネルモジュールもビルド
 make modules -j$(nproc)
 
-# ビルド成果物を確認（arch/x86/boot/のディレクトリは自動的にmakeの際に作成される）
+# ビルド成果物を確認
 ls -lh arch/x86/boot/bzImage
 
 # 成果物をコピー
-cp arch/x86/boot/bzImage ~/umu/step1/iso_root/boot/vmlinuz-6.6.58-custom
-cp .config ~/umu/step1/iso_root/boot/config-6.6.58-custom
+cp arch/x86/boot/bzImage ~/umu/step1/iso_root/boot/vmlinuz-6.6.58
+cp .config ~/umu/step1/iso_root/boot/config-6.6.58
 
 ※ビルド時間の目安: 10〜30分（環境による）
 
 
 3. initramfs 作成
 3.1 方法A: dracut を使う（coreutils版・推奨）
-
-一般的な Linux 環境（Ubuntu, RHEL など）を再現するため、coreutils を使用。
 
 cd ~/umu/step1/initramfs
 
@@ -142,18 +145,19 @@ sudo make -C ~/umu/step1/kernel/linux-6.6.58 modules_install \
   INSTALL_MOD_PATH=$PWD/modules
 
 # dracut で initramfs 生成（systemd を完全除外）
-dracut --kver 6.6.58-custom \
-  --kmoddir $PWD/modules/lib/modules/6.6.58-custom \
+dracut --kver 6.6.58 \
+  --kmoddir $PWD/modules/lib/modules/6.6.58 \
   --no-hostonly \
   --omit "systemd systemd-initrd busybox plymouth" \
   --add "bash drm" \
   --install "/usr/bin/bash /usr/bin/mount /usr/bin/umount /usr/bin/cp /usr/bin/mv /usr/bin/mkdir /usr/bin/cat /usr/bin/ls /usr/bin/chmod /usr/bin/ln /usr/bin/rm /usr/bin/chown /usr/bin/grep /usr/bin/sed" \
   --add-drivers "ahci sd_mod ext4 virtio_blk virtio_scsi virtio_pci" \
   --force \
-  initrd.img-6.6.58-custom
+  initrd.img-6.6.58
 
 # 成果物をコピー
-cp initrd.img-6.6.58-custom ~/umu/step1/iso_root/boot/
+cp initrd.img-6.6.58 ~/umu/step1/iso_root/boot/
+
 
 # 補足説明:
 # --no-hostonly              : ホスト固有の設定を含めない（汎用性向上）
@@ -165,7 +169,7 @@ cp initrd.img-6.6.58-custom ~/umu/step1/iso_root/boot/
 # initramfs の中身を確認（systemd が除外されているか検証）
 mkdir -p ~/umu/step1/initramfs/extracted
 cd ~/umu/step1/initramfs/extracted
-gunzip < ~/umu/step1/iso_root/boot/initrd.img-6.6.58-custom | cpio -idmv > ../initramfs-contents.txt
+gunzip < ~/umu/step1/iso_root/boot/initrd.img-6.6.58 | cpio -idmv > ../initramfs-contents.txt
 
 # systemd が除外されているか確認
 find . -name "*systemd*" | wc -l
@@ -253,8 +257,8 @@ menuentry "Umu Project - Custom Linux 6.6.58 (Normal Mode)" {
   insmod ext2
   
   # rd.shell を追加: エラー時に緊急シェルを起動
-  linux /boot/vmlinuz-6.6.58-custom ro console=tty1 console=ttyS0,115200 rd.shell
-  initrd /boot/initrd.img-6.6.58-custom
+  linux /boot/vmlinuz-6.6.58 ro console=tty1 console=ttyS0,115200 rd.shell
+  initrd /boot/initrd.img-6.6.58
 }
 
 menuentry "Umu Project - Custom Linux 6.6.58 (Debug Mode)" {
@@ -263,8 +267,8 @@ menuentry "Umu Project - Custom Linux 6.6.58 (Debug Mode)" {
   insmod ext2
   
   # rd.debug を追加: dracut のデバッグログを有効化
-  linux /boot/vmlinuz-6.6.58-custom ro console=tty1 console=ttyS0,115200 debug loglevel=7 rd.debug rd.shell
-  initrd /boot/initrd.img-6.6.58-custom
+  linux /boot/vmlinuz-6.6.58 ro console=tty1 console=ttyS0,115200 debug loglevel=7 rd.debug rd.shell
+  initrd /boot/initrd.img-6.6.58
 }
 EOF
 
@@ -340,7 +344,7 @@ qemu-system-x86_64 \
 
 期待される出力例:
 
-[    0.000000] Linux version 6.6.58-custom (root@hostname) ...
+[    0.000000] Linux version 6.6.58 (tama@umu) ...
 [    0.123456] Command line: ro console=tty1 console=ttyS0,115200 rd.shell
 [    0.234567] Kernel command line: ro console=tty1 console=ttyS0,115200 rd.shell
 [    1.234567] dracut: Mounted root filesystem /dev/root
@@ -433,22 +437,23 @@ ls -la usr/lib/dracut/modules.d/
 
 # dracut を再実行（systemd を明示的に除外）
 cd ~/umu/step1/initramfs
-dracut --kver 6.6.58-custom \
-  --kmoddir $PWD/modules/lib/modules/6.6.58-custom \
+dracut --kver 6.6.58 \
+  --kmoddir $PWD/modules/lib/modules/6.6.58 \
   --no-hostonly \
   --omit "systemd systemd-initrd busybox plymouth" \
   --add "bash drm" \
   --install "/usr/bin/bash /usr/bin/mount /usr/bin/umount /usr/bin/ls /usr/bin/cat /usr/bin/mkdir /usr/bin/cp /usr/bin/mv /usr/bin/chmod /usr/bin/ln /usr/bin/rm /usr/bin/chown /usr/bin/grep /usr/bin/sed" \
   --add-drivers "ahci sd_mod ext4 virtio_blk virtio_scsi virtio_pci" \
   --force \
-  initrd.img-6.6.58-custom
+  initrd.img-6.6.58
 
 # 成果物をコピー
-cp initrd.img-6.6.58-custom ~/umu/step1/iso_root/boot/
+cp initrd.img-6.6.58 ~/umu/step1/iso_root/boot/
 
 # grub.cfg に rd.shell が含まれているか確認
 cat ~/umu/step1/iso_root/boot/grub/grub.cfg | grep rd.shell
-# 出力例: linux /boot/vmlinuz-6.6.58-custom ro console=tty1 console=ttyS0,115200 rd.shell
+# 出力例: linux /boot/vmlinuz-6.6.58 ro console=tty1 console=ttyS0,115200 rd.shell
+
 
 # ISO 再作成
 cd ~/umu/step1
@@ -532,18 +537,18 @@ qemu-system-x86_64 \
 │   │   ├── .config                   # ビルド時の設定
 │   │   └── arch/x86/boot/bzImage     # カーネルイメージ（ビルド成果物）
 │   ├── linux-6.6.58.tar.xz           # ダウンロードしたアーカイブ
-│   └── config-6.6.58-custom          # 保存した設定（バックアップ）
+│   └── config-6.6.58                 # 保存した設定（バックアップ）
 ├── initramfs/
 │   ├── modules/                      # カーネルモジュール（一時ディレクトリ）
-│   │   └── lib/modules/6.6.58-custom/
+│   │   └── lib/modules/6.6.58/
 │   ├── extracted/                    # initramfs 展開内容（検証用）
 │   ├── initramfs-contents.txt        # initramfs ファイルリスト
-│   └── initrd.img-6.6.58-custom      # 生成された initramfs
+│   └── initrd.img-6.6.58             # 生成された initramfs
 ├── iso_root/
 │   └── boot/
-│       ├── vmlinuz-6.6.58-custom     # カーネルイメージ（コピー）
-│       ├── initrd.img-6.6.58-custom  # initramfs（コピー）
-│       ├── config-6.6.58-custom      # カーネル設定（コピー）
+│       ├── vmlinuz-6.6.58            # カーネルイメージ（コピー）
+│       ├── initrd.img-6.6.58         # initramfs（コピー）
+│       ├── config-6.6.58             # カーネル設定（コピー）
 │       └── grub/
 │           └── grub.cfg              # GRUB メニュー設定
 ├── logs/
@@ -554,7 +559,7 @@ qemu-system-x86_64 \
 重要な成果物:
 - step1-boot.iso: QEMU で直接起動可能な ISO イメージ
 - logs/serial-*.log: 起動ログ（トラブルシューティング用）
-- kernel/config-6.6.58-custom: カーネルビルド設定（再現性確保）
+- kernel/config-6.6.58: カーネルビルド設定（再現性確保）
 - initramfs/initramfs-contents.txt: initramfs の内容一覧
 
 
