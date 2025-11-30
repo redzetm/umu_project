@@ -1,3 +1,11 @@
+
+- 目的に直結 →          「最小限のカーネル＋BusyBox initramfsでQEMU起動確認」になっている
+- 構成がシンプル →       BusyBox採用で systemd 問題を回避
+- 成果物が明示 →         bzImage, initrd.img, grub.cfg, ISO が揃う
+- 成功条件が明確 →       GRUB表示 → カーネル起動 → シェル操作
+
+
+
 # 1. 環境準備
 
 ### 1.1 必要パッケージのインストール
@@ -18,7 +26,15 @@ bash
 mkdir -p ~/umu/step1/{kernel,initramfs,iso_root/boot/grub,logs}
 
 
+## 2. カーネルビルド
 
+### 2.1 ソース取得
+
+bash
+cd ~/umu/step1/kernel
+wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.6.58.tar.xz
+tar -xf linux-6.6.58.tar.xz
+cd linux-6.6.58
 
 
 
