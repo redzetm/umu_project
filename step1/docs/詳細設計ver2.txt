@@ -124,13 +124,14 @@ menuentry "Umu Project Linux 6.6.58" {
   initrd /boot/initrd.img-6.6.58
 }
 
-＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃　　ここまでできた　　＃＃＃＃＃＃＃＃＃＃＃＃＃＃
 
 5. ISOイメージ作成
 
 cd ~/umu/step1
 grub-mkrescue -o step1-boot.iso iso_root
 
+
+＃＃＃＃＃＃＃　　QEMU検証でうまく動かない　　＃＃＃＃＃＃＃＃＃
 
 6. QEMU検証
 
