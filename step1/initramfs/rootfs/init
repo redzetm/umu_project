@@ -1,0 +1,15 @@
+#!/bin/sh
+
+#- initramfs や chroot 環境で、まだ /proc がマウントされていないときに実行する
+#- QEMU で OS 自作テストするときも、ユーザランドが起動する前に /proc を
+#- マウントしておかないと ps や top が動かない
+mount -t proc none /proc
+
+# - initramfs や chroot 環境で、まだ /sys がマウントされていないときに実行する
+# - udev や systemd が正常に動作するために必要
+# - QEMUでのOS自作テストでも、デバイス検出やドライバの挙動を確認するために /sys を
+#   マウントしておくと便利
+mount -t sysfs none /sys
+mount -t devtmpfs none /dev
+echo "Umu Project Emergency Shell"
+exec /bin/sh
