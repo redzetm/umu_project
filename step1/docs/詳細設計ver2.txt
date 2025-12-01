@@ -62,7 +62,6 @@ cp arch/x86/boot/bzImage ~/umu/step1/iso_root/boot/vmlinuz-6.6.58
 cp .config ~/umu/step1/iso_root/boot/config-6.6.58
 
 
-＃＃＃＃＃＃＃＃＃　　一旦ここまでOK　　＃＃＃＃＃＃＃＃＃
 
 ## 3. initramfs（busybox版）作成
 
