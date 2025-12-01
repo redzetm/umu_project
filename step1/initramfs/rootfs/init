@@ -25,5 +25,7 @@ echo "Umu Project Emergency Shell"
 exec /bin/sh
 
 
+# この init は HDDにファイルを作るのではなく、カーネルが持つ仮想ファイルシステムを
+# マウントしてユーザランドからアクセスできるようにする処理です。
 
 
