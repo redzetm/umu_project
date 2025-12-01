@@ -80,6 +80,16 @@ cd ~/umu/step1/initramfs
 
 ### 3.2 initスクリプト作成
 
+GRUBからカーネル起動し、カーネルが初期化時、メモリ管理やデバイス検出など、カーネル内部の
+初期化が行われる。
+ここで「rootファイルシステム」をマウントする。
+initramfsを使う場合はその中の /init が最初に実行される。
+カーネルは最初のユーザランドプロセスとして 
+/sbin/init（またはinitramfs内の /init）を実行する。
+RHEL6系のinit処理に近いです。
+systemd の代替品というよりは、
+「systemd に渡す前段階」や「systemd がない環境で最低限動かすための簡易 init」 という理解が正しいです。
+
 sh
 // filepath: ~/umu/step1/initramfs/rootfs/init
 #!/bin/sh
