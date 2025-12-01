@@ -10,6 +10,20 @@ mount -t proc none /proc
 # - QEMUでのOS自作テストでも、デバイス検出やドライバの挙動を確認するために /sys を
 #   マウントしておくと便利
 mount -t sysfs none /sys
+
+# - initramfs や chroot 環境で /dev がまだ準備されていないときに実行する
+# - udev/systemd が動く前に最低限のデバイスノードを揃えるために必要
+# - QEMUでのOS自作テストでも、ユーザランドが /dev を必要とするので、devtmpfs を
+# マウントしておくと便利
 mount -t devtmpfs none /dev
+
+
+# 画面にメッセージを表示
 echo "Umu Project Emergency Shell"
+
+# シェルを起動して対話モードに入る
 exec /bin/sh
+
+
+
+
