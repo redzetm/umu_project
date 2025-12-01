@@ -143,6 +143,10 @@ qemu-system-x86_64 \
   -serial file:logs/serial.log \
   -nographic
 
+qemu-system-x86_64 -enable-kvm -m 2048 -cdrom step1-boot.iso -nographic -serial file:logs/serial.log　#起動しない
+qemu-system-x86_64 -enable-kvm -m 2048 -cdrom step1-boot.iso -nographic #起動する
+
+上記なんで？
 
 
 7. 成功条件
