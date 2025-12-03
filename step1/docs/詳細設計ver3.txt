@@ -1,8 +1,9 @@
+詳細設計ver3
 
-- 目的に直結 →          「最小限のカーネル＋BusyBox initramfsでQEMU起動確認」になっている
-- 構成がシンプル →       BusyBox採用で systemd 問題を回避
-- 成果物が明示 →         bzImage, initrd.img, grub.cfg, ISO が揃う
-- 成功条件が明確 →       GRUB表示 → カーネル起動 → シェル操作
+目的に直結 →          「最小限のカーネル＋BusyBox initramfsでQEMU起動確認」になっている
+構成がシンプル →       BusyBox採用で systemd 問題を回避
+成果物が明示 →         bzImage, initrd.img, grub.cfg, ISO が揃う
+成功条件が明確 →       GRUB表示 → カーネル起動 → シェル操作
 
 
 
