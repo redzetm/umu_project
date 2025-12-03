@@ -1,6 +1,12 @@
 やりたいこと
 
-
+Step1では、以下の機能を持っている
+    QEMUで動作する
+        qemu-system-x86_64 -cdrom step1-boot.iso でISOイメージを起動
+    UEFI起動
+    GRUBのメニューからLinuxカーネル6.6.58を選択して起動
+    initが走りレスキューモードで/bin/shが起動
+    BusyBox採用により、基本的なUNIXコマンドが利用可能
 
 
 
