@@ -1,0 +1,75 @@
+# Step1プロジェクト まとめ
+
+---
+
+## 目的・ゴール
+- 最小限のカーネル＋BusyBox initramfsでQEMU起動確認
+- BusyBox採用でsystemd問題を回避
+- 成果物：bzImage, initrd.img, grub.cfg, ISO
+- 成功条件：GRUB表示 → カーネル起動 → シェル操作
+
+---
+
+## 手順サマリ
+
+### 1. 環境準備
+- 必要パッケージをインストール
+- ディレクトリ作成
+
+### 2. カーネルビルド
+- ソース取得・展開
+- make mrproper, make defconfig
+- make -j$(nproc) でビルド
+- bzImage, .config をiso_root/boot/へコピー
+
+### 3. initramfs（busybox版）作成
+- rootfsディレクトリ構成作成
+- busybox配置＆リンク作成
+- initスクリプト（shで書く）
+- cpio+gzipでinitrd.img-6.6.58作成
+- iso_root/boot/へコピー
+
+### 4. GRUB設定
+- grub.cfg作成（vmlinuz-6.6.58, initrd.img-6.6.58指定）
+
+### 5. ISOイメージ作成
+- grub-mkrescue -o step1-boot.iso iso_root
+
+### 6. QEMU検証
+- qemu-system-x86_64 -enable-kvm -m 2048 -cdrom step1-boot.iso -nographic
+- シェルが出れば成功
+
+---
+
+## 注意点・トラブル例
+- KVM権限エラー時はkvmグループ追加＆再ログイン
+- busyboxコマンドリンク忘れに注意
+- initスクリプトはshで書く（bash不要）
+- cpio+gzipの流れを分けて実行すると分かりやすい
+- GRUBのlinux行でカーネル・initrd名を間違えない
+- QEMUのシリアルログ指定で起動しない場合は -serial オプションを外すと動くことがある
+
+---
+
+## 参考コマンド
+
+```bash
+# busyboxコマンド一覧
+busybox --list | wc -l
+
+# cpioアーカイブ作成例
+cd rootfs
+find . | cpio -o -H newc > ../initrd.img-6.6.58
+gzip -f ../initrd.img-6.6.58
+cp ../initrd.img-6.6.58.gz ../iso_root/boot/initrd.img-6.6.58
+```
+
+---
+
+## まとめ
+- シンプルな構成でLinux起動の仕組みを体験できる
+- busybox＋initスクリプトで最小限の環境が作れる
+- 問題が起きたら各ステップごとに切り分けて確認
+
+---
+
