@@ -13,14 +13,15 @@ Step2では、以下の機能を持つ構成にする
     QEMUで動作する
         qemu-system-x86_64 -cdrom step2-boot.iso でISOイメージを起動
     UEFI起動
-    GRUBのメニューからLinuxカーネル6.6.58を選択して起動
+    GRUBのメニューには以下のメニューを表示（２つ）
+        Umu Project Linux kernel 6.6.58
+        Umu Project rescue 6.6.58
     initが走り、マルチユーザーモードでログインプロンプトを表示
         ユーザーは
             rootとtamaの2名のみ
-                loginユーザーとパスワードは、手動でファイル作成で行う
-            すべてのtty出力をlogs/log.txtに保存する
-    busyboxのコマンドは全部使えるようにする
-        busybox --install -s /bin
+                busyboxを利用する
+        busyboxのコマンドは全部使えるようにする
+            busybox --install -s /bin
     何かしら起動を抜けれる仕組みを作る
         Step1では、ps -auxでPID調べて、kill -kill PIDで強制終了していた
 
