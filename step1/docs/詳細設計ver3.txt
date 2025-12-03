@@ -39,6 +39,7 @@ cd linux-6.6.58
 
 ### 2.2 カーネル設定
 
+今回は、デフォルト状態でmakeする。
 bash
 make mrproper           #カーネルソースツリーを完全にクリーンな状態にする
 make defconfig          #コンフィグレーション生成
@@ -129,7 +130,7 @@ menuentry "Umu Project Linux 6.6.58" {
 5. ISOイメージ作成
 
 cd ~/umu/step1
-grub-mkrescue -o step1-boot.iso iso_root
+grub-mkrescue -o step1-boot.iso iso_root　　　　※GRUBのレスキュー用ISOイメージを作るコマンド
 
 
 ＃＃＃＃＃＃＃　　QEMU検証でうまく動かない　　＃＃＃＃＃＃＃＃＃
