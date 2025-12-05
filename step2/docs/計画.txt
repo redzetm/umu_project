@@ -10,7 +10,7 @@ Step1で構築したUEFI + GRUB + Linuxカーネル + BusyBox環境を拡張し�
 
 ■Step1で実現済みの機能
 - QEMUで動作
-    コマンド: qemu-system-x86_64 -cdrom step1-boot.iso
+    コマンド: qemu-system-x86_64 -cdrom step1-boot.iso（もちろんそのほかのオプションも利用）
 - UEFI起動
 - GRUBメニューから Linux kernel 6.6.58 を選択して起動
 - initが走り、レスキューモードで /bin/sh が起動
