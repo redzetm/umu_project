@@ -26,7 +26,7 @@ Step2では、以下の機能を持つ構成にする
         Step1では、ps -auxでPID調べて、kill -kill PIDで強制終了していた
 
 
-
+上記を踏まえ、~umu/step2/docs/計画.txtを作成する
 
 
 
