@@ -120,6 +120,9 @@ dwarves
     BTF と DWARF の出力を比較し、整合性を確認。
   - その他ユーティリティ
     ELF バイナリに埋め込まれた DWARF デバッグ情報を読み取り、整形表示や解析を行う。
+  - Linuxカーネルビルドで必須
+    カーネルの BPF (Berkeley Packet Filter) 機能や BTF 情報生成に 
+    pahole が使われるため、dwarves が無いとビルドが途中で失敗する。
 
 
 
