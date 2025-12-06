@@ -1,4 +1,4 @@
-Umu Project Step2 詳細設計書
+Umu Project Step2 詳細設計書ver1
 
 1. 環境準備
 
