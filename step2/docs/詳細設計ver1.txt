@@ -11,6 +11,9 @@ sudo apt install -y build-essential bc bison flex libssl-dev \
   qemu-system-x86 ovmf \
   cpio gzip busybox-static
 
+※現在の環境にすでに導入済みのPKGもあるが、Ubuntuでは、上書きは問題ないので
+このコマンドラインでも大丈夫です！
+
 
 各PKGの説明
 build-essential
@@ -184,10 +187,21 @@ ovmf
   - UEFI 対応 OS（Linux, Windows, 自作OSなど）を仮想環境で起動可能にする
   - BIOS ではなく UEFI を前提としたブート検証を可能にする
 
+cpio
+  UNIX 系システムで古くから使われているアーカイブ作成・展開用のコマンドラインツールで、
+  ファイルやディレクトリをまとめたり展開したりする際に利用されます。
+  - initramfs の生成に利用
+    Linux カーネルの起動時に使われる初期 RAM ディスク (initramfs) は cpio 形式で作られる。
 
+gzip
+  GNU プロジェクトが開発したファイル圧縮コマンドで、拡張子 .gz を持つ圧縮ファイルを
+  作成・展開するために使われます。
 
-
-
+busybox-static
+  busybox-static は BusyBox をスタティックリンク（静的リンク）したバイナリを
+  提供するパッケージです。BusyBox は
+  「小さなユーティリティをひとつの実行ファイルにまとめたツール集」で、
+  Linux の組み込み環境やレスキュー環境でよく使われます。
 
 
 
