@@ -165,8 +165,24 @@ xorriso の主な機能
   - grub-mkrescue が内部で xorriso を呼び出す
   GRUB を組み込んだ ISO を作るとき、xorriso が ISO 9660 ファイルシステムを生成する。
 
+mtools
+  Unix/Linux 環境から MS-DOS ファイルシステム（特にフロッピーディスクやそのイメージ）を
+  マウントせずに直接操作できるユーティリティ集です。
+  - ディスクをマウントせずに直接アクセス可能
+  - DOS のコマンドに似た操作体系（例: mcopy, mdir, mtype）
+  - QEMU や VirtualBox などの仮想環境でフロッピーイメージを扱う際にも利用可能
 
+qemu-system-x86
+  qemu-system-x86 は QEMU の「システムエミュレーション」モードで 
+  x86 アーキテクチャを仮想化する実行ファイルです。これを使うことで、
+  Intel/AMD 系 CPU（32bit/64bit）の仮想マシンを作成し、Linux や自作OSを起動・検証できます。
 
+ovmf
+  仮想マシンで UEFI を利用可能にするためのファームウェアプロジェクトで、
+  QEMU や KVM などの仮想環境で UEFI ブートを実現するために使われます。
+  - 仮想マシンに UEFI ファームウェア環境を提供
+  - UEFI 対応 OS（Linux, Windows, 自作OSなど）を仮想環境で起動可能にする
+  - BIOS ではなく UEFI を前提としたブート検証を可能にする
 
 
 
