@@ -232,6 +232,10 @@ cp .config ../config-6.6.58     ※バックアップを~/umu/step2/kernelに保
 
 make -j$(nproc)
 
+※make -j$(nproc)は、make defconfigで生成した.configを使いカーネルを
+ビルドする。
+
+
 2.4 成果物コピー
 
 cp arch/x86/boot/bzImage ~/umu/step2/iso_root/boot/vmlinuz-6.6.58
