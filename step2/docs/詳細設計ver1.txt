@@ -252,16 +252,35 @@ cd ~/umu/step2/initramfs
 
 3.2 ユーザー構成
 
-/etc/passwd と /etc/shadow を作成。
+/etc/passwd と /etc/shadow を作成する。
+※ /etc/passwd はユーザー情報、/etc/shadow はパスワードハッシュを保持する。
+※ su による root 昇格を計画通り動作させるため、root のパスワードは必須。
+※ パスワードハッシュは openssl や mkpasswd で生成し、ここに埋め込む。
 
 # ~/umu/step2/initramfs/rootfs/etc/passwd
-root:x:0:0:root:/root:/bin/sh
-tama:x:1000:1000:tama:/home/tama:/bin/sh
+root:x:0:0:root:/root:/bin/sh        # root ユーザー。ホームは /root、シェルは /bin/sh
+tama:x:1000:1000:tama:/home/tama:/bin/sh  # 一般ユーザー tama。ホームは /home/tama、シェルは /bin/sh
 
 
 # ~/umu/step2/initramfs/rootfs/etc/shadow
-root::19000:0:99999:7:::
-tama::19000:0:99999:7:::
+# フォーマット: 
+# ユーザー名:パスワードハッシュ:最終変更日:最小日数:最大日数:警告日数:非アクティブ:有効期限
+# root のパスワードは必須。tama は任意だが、ログイン時にパスワード入力を求めるなら設定する。
+# パスワードハッシュ生成方法:
+#   1. SHA-512 方式 (openssl)
+#      $ openssl passwd -6
+#      → パスワードを入力すると $6$... 形式のハッシュが出力される
+#
+#   2. yescrypt 方式 (mkpasswd)
+#      $ mkpasswd --method=yescrypt
+#      → パスワードを入力すると $y$j9T$... 形式のハッシュが出力される
+#
+# 生成したハッシュを以下のフィールドに貼り付ける。
+
+root:$y$j9T$exampleRootHashHere:19000:0:99999:7:::   # root のパスワードハッシュ
+tama:$y$j9T$exampleTamaHashHere:19000:0:99999:7:::   # tama のパスワードハッシュ
+
+
 
 3.3 initスクリプト作成
 
@@ -350,13 +369,5 @@ qemu-system-x86_64 \
 - reboot → GRUB再起動
 
 202512061233一旦完成
-
-
-
-
-
-
-
-
 
 
