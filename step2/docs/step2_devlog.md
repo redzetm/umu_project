@@ -38,6 +38,17 @@
 - 結果: arch/x86/boot/bzImageとしてカーネルイメージ生成できた。
 - 課題: 特になし
 
+## [2025-12-07 08:48] 2.4 成果物コピー
+- 実行: cp arch/x86/boot/bzImage ~/umu/step2/iso_root/boot/vmlinuz-6.6.58
+        ※bzImageをブートイメージとしてvmlinuz-6.6.58として~/umu/step2/iso_root/boot/にコピー
+        vmlinuz-6.6.58は、GRUB（ブートローダー）が読み込む。
+
+        cp .config ~/umu/step2/iso_root/boot/config-6.6.58
+        ※vmlinuz-6.6.58と同じディレクトリに入れてるけど、もしconfig-6.6.58が無くても
+        影響しない。慣例的に同じディレクトリに入れてる
+- 結果: OK
+- 課題: 特になし
+
 
 
 
