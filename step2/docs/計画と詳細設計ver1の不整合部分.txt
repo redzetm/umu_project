@@ -1,0 +1,49 @@
+🔍 矛盾・不整合ポイント
+1. BusyBox のインストールパス
+計画書では busybox --install -s /bin と明示されていて、全コマンドを /bin にリンクする方針。
+詳細設計では cd rootfs/bin → busybox --install -s . としており、rootfs/bin 配下に
+シンボリックリンクを展開する形。
+👉 この違いにより、計画書の「全コマンドを /bin に展開」と
+詳細設計の「initramfs 内の bin ディレクトリに展開」で食い違いがあります。 
+（ただし initramfs 内の /bin として扱うなら問題はないですが、計画書の表現と設計書の手順がズレています）
+
+
+2. poweroff / reboot コマンドの利用可否
+計画書では「Step2で poweroff / reboot コマンドを導入」と明記。
+詳細設計では BusyBox を導入しているだけで、init スクリプトに特別な処理はなく、
+BusyBox が提供する poweroff / reboot コマンドに依存。
+👉 BusyBox のビルドオプションによっては poweroff / reboot が含まれない場合があります。
+詳細設計では「BusyBox版 initramfs」としか書かれていないため、計画書の「導入」とは少し表現が弱いです。
+（ただし Ubuntu の busybox-static には通常含まれているので、実際には動作するはず）
+
+
+3. init スクリプトの動作モード
+計画書では「マルチユーザーモードでログインプロンプトを表示」と記載。
+詳細設計の init スクリプトでは /sbin/getty -L ttyS0 115200 vt100 & を
+起動し、最後に exec /bin/sh を実行。
+👉 exec /bin/sh があるため、シェルが即座に起動してしまい、
+getty によるログインプロンプトが正しく機能しない可能性があります。 
+本来は exec /sbin/init や exec /sbin/getty に統一する方が「マルチユーザーモード」の意図に合致します。
+
+
+4. GRUB 設定と rescue モード
+計画書では rescue モードを「シングルユーザーモード」として root ログインを想定。
+詳細設計では GRUB の rescue エントリに ro single console=ttyS0,115200 を
+指定しているが、initramfs の init スクリプトは rescue 用の分岐を持っていない。
+👉 GRUB 側で single を渡しても init スクリプトがそれを解釈していないため、
+通常モードと同じ動作になる可能性があります。
+
+
+5. パッケージ説明の一部不整合
+git の説明が「バー上ン管理を使えるようにする」と誤記。 → 「バージョン管理を使えるようにする」が正しい。
+
+
+✅ まとめ
+軽微な矛盾：BusyBox のインストールパス表現、git の説明誤記。
+設計上の不整合：init スクリプトが「マルチユーザーモード」と計画書にあるのに、実際は exec /bin/sh でシングルユーザ的になる可能性。
+潜在的な不整合：GRUB rescue モードの指定が initramfs 側で処理されていない。
+👉 修正するとすれば：
+init スクリプトから exec /bin/sh を外し、getty に制御を渡す。
+BusyBox のインストールパスを計画書と詳細設計で統一。
+GRUB rescue モードに対応する initramfs 側の分岐を追加。
+git の説明を修正。
