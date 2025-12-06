@@ -29,6 +29,8 @@ BusyBox が提供する poweroff / reboot コマンドに依存。
 getty によるログインプロンプトが正しく機能しない可能性があります。 
 本来は exec /sbin/init や exec /sbin/getty に統一する方が「マルチユーザーモード」の意図に合致します。
 
+↑↑↑解決↑↑↑
+
 
 4. GRUB 設定と rescue モード
 計画書では rescue モードを「シングルユーザーモード」として root ログインを想定。
