@@ -35,8 +35,10 @@
 - 実行: make -j$(nproc)
         ※make -j$(nproc)は、make defconfigで生成した.configを使いカーネルを
         ビルドする。
-- 結果: 
-- 課題: 
+- 結果: arch/x86/boot/bzImageとしてカーネルイメージ生成できた。
+- 課題: 特になし
+
+
 
 
 
