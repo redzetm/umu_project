@@ -124,6 +124,23 @@ dwarves
     カーネルの BPF (Berkeley Packet Filter) 機能や BTF 情報生成に 
     pahole が使われるため、dwarves が無いとビルドが途中で失敗する。
 
+git
+  バー上ン管理を使えるようにする
+
+wget
+  カーネルソースをダウンロード
+
+grub-efi-amd64-bin
+  grub-efi-amd64-bin は GRUB2（GRand Unified Bootloader）の EFI/UEFI 用
+  モジュール群（AMD64向け）を含むパッケージです。
+  UEFI 環境で OS を起動するために必要な GRUB のバイナリ部品を提供します。
+  なんでAMDはついてるか？は、歴史的経緯がある。
+  64bit 拡張を最初に設計したのが AMD（AMD64 アーキテクチャ）→ Intel は後から互換性を
+  持つ形で採用しました（Intel64）。
+  Debian/Ubuntu では「x86_64」を「amd64」と呼ぶのが慣習になっています。
+  → これは「AMD が最初に提案した拡張仕様に由来する名前」であり、
+  Intel CPU でも問題なく使えます。
+
 
 
 
