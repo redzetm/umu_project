@@ -224,9 +224,9 @@ cd linux-6.6.58
 今回はデフォルト設定でビルド。
 
 cd linux-6.6.58
-make mrproper
-make defconfig
-cp .config ../config-6.6.58
+make mrproper        ※カーネルソースツリーを「完全初期化」する
+make defconfig       ※Linuxカーネルのビルドにおける 「デフォルト設定ファイル（.config）の生成」 を行う
+cp .config ../config-6.6.58     ※バックアップを~/umu/step2/kernelに保存
 
 2.3 ビルド
 
