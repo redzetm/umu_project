@@ -25,11 +25,17 @@
 
 ## [2025-12-07 07:41] 2.2 カーネル設定（今回はデフォルト設定でビルド。）
 - 実行: cd linux-6.6.58
-        make mrproper
-        make defconfig
-        cp .config ../config-6.6.58
-- 結果: 
-- 課題: 
+        make mrproper     ※カーネルソースツリーを「完全初期化」する
+        make defconfig    ※Linuxカーネルのビルドにおける 「デフォルト設定ファイル（.config）の生成」 を行う
+        cp .config ../config-6.6.58    ※バックアップを~/umu/step2/kernelに保存
+- 結果: OK
+- 課題: 特になし
+
+
+
+
+
+
 
 
 
