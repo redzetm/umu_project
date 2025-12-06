@@ -58,3 +58,31 @@ init スクリプトから exec /bin/sh を外し、getty に制御を渡す。
 BusyBox のインストールパスを計画書と詳細設計で統一。
 GRUB rescue モードに対応する initramfs 側の分岐を追加。
 git の説明を修正。
+
+
+再度確認してOKか？　以下の要素を検討する
+
+
+⚠️ 差異・補足が必要な点
+initスクリプトと getty の場所
+詳細設計では exec /sbin/getty -L ttyS0 115200 vt100 を呼び出していますが、
+initramfs の構成では /sbin に getty を配置していません。
+BusyBox の getty を使うなら /bin/getty になるはずなので、パスの整合性確認が必要です。
+
+ユーザー認証
+/etc/shadow の root/tama のパスワードフィールドが空 (::) になっているため、
+パスワードなしログインになります。
+計画書では「tamaユーザーは su により root 昇格」とあるので、パスワード設定が必要では？
+（現状だと su で昇格できない可能性あり）。
+
+終了コマンドの確認
+BusyBox の poweroff / reboot は root 権限で動作します。
+詳細設計の成功条件に含まれているが、su の動作確認が必要。
+su が BusyBox に含まれているか、initramfs に展開されているかを確認すると安心。
+
+QEMU起動オプション
+計画書では qemu-system-x86_64 -cdrom step2-boot.iso -serial stdio とシンプルに記載。
+
+詳細設計では -enable-kvm -m 2048 -nographic を追加している。
+これは拡張なので問題なしだが、計画書との差異として認識しておくと良い。
+
