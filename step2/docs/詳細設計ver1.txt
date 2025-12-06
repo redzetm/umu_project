@@ -245,8 +245,8 @@ cp .config ~/umu/step2/iso_root/boot/config-6.6.58
 cd ~/umu/step2/initramfs
 mkdir -p rootfs/{bin,sbin,etc,proc,sys,dev,home/tama,root}
 cp /usr/bin/busybox rootfs/bin/
-cd rootfs/bin
-busybox --install -s .
+cd ~/umu/step2/initramfs/rootfs/bin
+busybox --install -s /bin
 cd ~/umu/step2/initramfs
 
 
@@ -274,8 +274,8 @@ mount -t devtmpfs none /dev
 echo "Umu Project Step2: Multi-user mode"
 
 # ログインプロンプトをシリアルに出す
-/sbin/getty -L ttyS0 115200 vt100 &
-exec /bin/sh
+exec /sbin/getty -L ttyS0 115200 vt100
+
 
 chmod +x rootfs/init
 
