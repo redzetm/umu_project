@@ -338,6 +338,8 @@ qemu-system-x86_64 \
 - poweroff → 仮想マシン終了
 - reboot → GRUB再起動
 
+202512061233一旦完成
+
 
 
 
