@@ -141,6 +141,34 @@ grub-efi-amd64-bin
   → これは「AMD が最初に提案した拡張仕様に由来する名前」であり、
   Intel CPU でも問題なく使えます。
 
+grub-common
+  grub-common は GRUB（GRand Unified Bootloader）の共通ファイル群をまとめたパッケージです。
+  GRUB Legacy と GRUB2 の両方で共有されるファイルや、GRUB2 特有でも互換性を壊さない範囲の
+  ファイルが含まれています。
+  - GRUB の各バリエーション（BIOS版、UEFI版など）で共通して利用されるファイルを提供。
+  - GRUB Legacy と GRUB2 の両方で使えるように設計されている。
+  - GRUB を正しく動かすための基盤として必須
+
+xorriso
+xorriso は ISO 9660 ファイルシステムイメージを作成・操作するためのツールです。
+特に GRUB の grub-mkrescue コマンドと組み合わせて、ブート可能な ISO イメージを
+生成する際に利用されます。
+xorriso の主な機能
+  - ISOイメージの作成
+    ディレクトリ構造から ISO 9660 イメージを生成。
+  - ISOイメージの編集
+    既存の ISO にファイルを追加・削除・更新可能。
+  - ブート可能ISOの生成
+    GRUB と連携して、BIOS/UEFI 両対応のブート可能 ISO を作成。
+  - El Torito / UEFI ブート対応
+    CD/DVD/USB から起動できる ISO を作る際に必須。
+  - grub-mkrescue が内部で xorriso を呼び出す
+  GRUB を組み込んだ ISO を作るとき、xorriso が ISO 9660 ファイルシステムを生成する。
+
+
+
+
+
 
 
 
