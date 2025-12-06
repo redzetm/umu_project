@@ -1,31 +1,50 @@
+# ============================
+# Umu Project Step1 / Step2 共通設定
+# ============================
+
 # カーネルソース（展開後のディレクトリ）
 step1/kernel/linux-*/
+step2/kernel/linux-*/
 
 # カーネルアーカイブ
 step1/kernel/*.tar.xz
 step1/kernel/*.tar.gz
 step1/kernel/*.tar.bz2
+step2/kernel/*.tar.xz
+step2/kernel/*.tar.gz
+step2/kernel/*.tar.bz2
 
 # initramfs 関連の一時ファイル
 step1/initramfs/modules/
 step1/initramfs/extracted/
 step1/initramfs/*.img
+step2/initramfs/modules/
+step2/initramfs/extracted/
+step2/initramfs/*.img
 
 # ISO イメージ
 step1/*.iso
 step1/OVMF_VARS_custom.fd
+step2/*.iso
+step2/OVMF_VARS_custom.fd
 
 # ログファイル
 step1/logs/*.log
+step2/logs/*.log
 
 # ビルド成果物（iso_root 内）
 step1/iso_root/boot/vmlinuz-*
 step1/iso_root/boot/initrd.img-*
+step2/iso_root/boot/vmlinuz-*
+step2/iso_root/boot/initrd.img-*
 
 # バックアップディレクトリ
 step1/kernel.backup.*
 step1/initramfs.backup.*
 step1/iso_root.backup.*
+step2/kernel.backup.*
+step2/initramfs.backup.*
+step2/iso_root.backup.*
 
 # エディタの一時ファイル
 *~
