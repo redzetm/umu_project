@@ -267,7 +267,7 @@ tama::19000:0:99999:7:::
 
 # ~/umu/step2/initramfs/rootfs/init
 
-#!/bin/sh   # シェルスクリプトとして実行することを宣言
+#!/bin/sh
 
 # --- 仮想ファイルシステムのマウント ---
 mount -t proc none /proc        # プロセス情報を提供する /proc をマウント
@@ -288,9 +288,7 @@ else
   exec /sbin/getty -L ttyS0 115200 vt100   # シリアルコンソールにログインプロンプトを表示
 fi
 
-
-
-chmod +x rootfs/init
+chmod +x rootfs/init    #実行パーミッション追加
 
 
 3.4 cpioアーカイブ作成
