@@ -35,7 +35,10 @@ Step1で構築したUEFI + GRUB + Linuxカーネル + BusyBox環境を拡張し�
        - tama
    - BusyBoxを利用
    - BusyBoxの全コマンドを利用可能にするため以下を実行:
-       busybox --install -s /bin
+       # BusyBox の全コマンドを initramfs 内の /bin に展開
+        cd ~/umu/step2/initramfs/rootfs/bin
+        busybox --install -s /bin
+
 
 4. 起動終了の仕組み
    - Step1では ps -aux → kill -kill PID による強制終了を利用

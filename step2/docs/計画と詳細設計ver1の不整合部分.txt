@@ -7,6 +7,8 @@
 詳細設計の「initramfs 内の bin ディレクトリに展開」で食い違いがあります。 
 （ただし initramfs 内の /bin として扱うなら問題はないですが、計画書の表現と設計書の手順がズレています）
 
+↑↑↑解決↑↑↑
+
 
 2. poweroff / reboot コマンドの利用可否
 計画書では「Step2で poweroff / reboot コマンドを導入」と明記。
@@ -15,6 +17,8 @@ BusyBox が提供する poweroff / reboot コマンドに依存。
 👉 BusyBox のビルドオプションによっては poweroff / reboot が含まれない場合があります。
 詳細設計では「BusyBox版 initramfs」としか書かれていないため、計画書の「導入」とは少し表現が弱いです。
 （ただし Ubuntu の busybox-static には通常含まれているので、実際には動作するはず）
+
+↑↑↑解決↑↑↑
 
 
 3. init スクリプトの動作モード
