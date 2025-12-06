@@ -285,7 +285,7 @@ if echo "$CMDLINE" | grep -q "single"; then
 else
   # 通常起動の場合 → マルチユーザーモード
   echo "Umu Project Step2: Multi-user mode"
-  exec /sbin/getty -L ttyS0 115200 vt100   # シリアルコンソールにログインプロンプトを表示
+  exec /bin/getty -L ttyS0 115200 vt100   # シリアルコンソールにログインプロンプトを表示
 fi
 
 chmod +x rootfs/init    #実行パーミッション追加
