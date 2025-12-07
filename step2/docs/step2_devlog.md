@@ -284,7 +284,8 @@ grub-mkrescue -o step2-boot.iso iso_root
 qemu-system-x86_64 -enable-kvm -m 2048 -cdrom step2-boot.iso -nographic
 
 
-
+Step2はバグ修正していたら何が何だか分からなくなったので、Step2の一番最初のinitでの
+kernel panicまで再現するStep3を作成してからバグ修正を行うことにした
 
 
 
