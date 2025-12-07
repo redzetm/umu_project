@@ -1,15 +1,26 @@
 #!/bin/sh
-# --- 仮想ファイルシステムのマウント ---
-mount -t proc proc /proc
-mount -t sysfs sysfs /sys
-mount -t devtmpfs devtmpfs /dev
 
-CMDLINE="$(cat /proc/cmdline)"
+# デバッグメッセージを追加
+echo "[DEBUG] Mounting proc, sys, dev..."
+mount -t proc none /proc
+mount -t sysfs none /sys
+mount -t devtmpfs none /dev
+
+echo "[DEBUG] Reading kernel cmdline..."
+CMDLINE=$(cat /proc/cmdline)
+echo "[DEBUG] CMDLINE=$CMDLINE"
 
 if echo "$CMDLINE" | grep -q "single"; then
-  echo "Umu Project Step2: Single-user rescue mode"
+  echo "[DEBUG] Single-user rescue mode"
   exec /bin/sh
 else
-  echo "Umu Project Step2: Multi-user mode"
-  exec /sbin/getty -L ttyS0 115200 vt100
+  echo "[DEBUG] Multi-user mode, starting getty..."
+  
+  # gettyが存在するか確認
+  if [ ! -x /bin/getty ]; then
+    echo "[ERROR] /bin/getty not found or not executable!"
+    exec /bin/sh  # フォールバック
+  fi
+  
+  exec /bin/getty -L ttyS0 115200 vt100
 fi
