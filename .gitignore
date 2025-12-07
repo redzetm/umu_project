@@ -21,6 +21,7 @@ step1/initramfs/*.img
 step2/initramfs/modules/
 step2/initramfs/extracted/
 step2/initramfs/*.img
+step2/initramfs/rootfs/bin/*
 
 # ISO イメージ
 step1/*.iso
