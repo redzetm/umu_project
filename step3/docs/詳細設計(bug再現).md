@@ -147,7 +147,7 @@ else
   exec /bin/getty -L ttyS0 115200 vt100   # シリアルコンソールにログインプロンプトを表示
 fi
 
-chmod +x rootfs/init    #実行パーミッション追加
+chmod +x rootfs/init    #実行パーミッション追加　755が良い
 
 
 3.4 cpioアーカイブ作成
@@ -161,7 +161,7 @@ cp initrd.img-6.6.58 ../iso_root/boot/
 4. GRUB設定
 
 # ~/umu/step3/iso_root/boot/grub/grub.cfg
-set timeout=10
+set timeout=20
 set default=0
 
 menuentry "Umu Project Linux kernel 6.6.58" {
@@ -190,7 +190,7 @@ qemu-system-x86_64 \
   -cdrom step3-boot.iso \
   -nographic
 
-↑↑↑↑↑↑　　ここで、カーネル起動が止まる　　↑↑↑↑
+↑↑↑↑↑↑　　ここで、カーネル起動が止まる　　↑↑↑↑   再現するはずが、修正しながら進めたらうまくいった
 
 
 詳細設計(bug修正).md で検証する
