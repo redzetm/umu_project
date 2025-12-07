@@ -139,11 +139,36 @@ else
   exec /bin/getty -L ttyS0 115200 vt100   # シリアルコンソールにログインプロンプトを表示
 fi
 
-chmod +x rootfs/init    #実行パーミッション追加
+chmod +x rootfs/init    
+#実行パーミッション追加  本来はrootユーザー所有が望ましいが今回は研究様なのでtamaのままとする755
 - 結果: OK
 - 課題: 特になし
 
+## [2025-12-07 16：27] 3.4 cpioアーカイブ作成
+- 実行: 
+cd rootfs
+find . | cpio -o -H newc | gzip > ../initrd.img-6.6.58
+cd ..
+cp initrd.img-6.6.58 ../iso_root/boot/
+- 結果: OK
+- 課題: 特になし
 
+# [2025-12-07 16：50] 4. GRUB設定
+- 実行: # ~/umu/step2/iso_root/boot/grub/grub.cfg
+set timeout=10
+set default=0
+
+menuentry "Umu Project Linux kernel 6.6.58" {
+  linux /boot/vmlinuz-6.6.58 ro console=ttyS0,115200
+  initrd /boot/initrd.img-6.6.58
+}
+
+menuentry "Umu Project rescue 6.6.58" {
+  linux /boot/vmlinuz-6.6.58 ro single console=ttyS0,115200
+  initrd /boot/initrd.img-6.6.58
+}
+- 結果: 
+- 課題: 
 
 
 
