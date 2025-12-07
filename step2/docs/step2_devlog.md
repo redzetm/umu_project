@@ -49,6 +49,44 @@
 - 結果: OK
 - 課題: 特になし
 
+## [2025-12-07 09:16] 3.1 構造作成(initramfs（BusyBox版）)
+- 実行: cd ~/umu/step2/initramfs
+# 作業ディレクトリを initramfs に移動
+
+mkdir -p rootfs/{bin,sbin,etc,proc,sys,dev,home/tama,root}
+# initramfs 内に必要なディレクトリ構造を作成
+# - bin: 基本コマンド配置
+# - sbin: 管理者用コマンド配置
+# - etc: 設定ファイル配置
+# - proc: procfs マウントポイント
+# - sys: sysfs マウントポイント
+# - dev: デバイスファイル配置
+# - home/tama: ユーザー tama のホームディレクトリ
+# - root: root ユーザーのホームディレクトリ
+
+cp /usr/bin/busybox rootfs/bin/
+# busybox バイナリを rootfs/bin にコピー
+# → initramfs 内で基本コマンドを提供するため
+
+cd ~/umu/step2/initramfs/rootfs/bin
+# busybox を配置した bin ディレクトリに移動
+
+busybox --install -s /bin
+# busybox が提供するコマンド群を /bin にシンボリックリンクとして展開
+# 例: ln -s busybox ls, ln -s busybox cat など
+# → initramfs 内で ls, cat, ps, su などが利用可能になる
+
+cd ~/umu/step2/initramfs
+# 作業ディレクトリを initramfs のルートに戻す
+- 結果: 
+- 課題: 
+
+
+
+
+
+
+
 
 
 
