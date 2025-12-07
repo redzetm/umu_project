@@ -49,7 +49,7 @@
 - 結果: OK
 - 課題: 特になし
 
-## [2025-12-07 09:16] 3.1 構造作成(initramfs（BusyBox版）)
+## [2025-12-07 14：13] 3.1 構造作成(initramfs（BusyBox版）)
 - 実行: cd ~/umu/step2/initramfs
 # 作業ディレクトリを initramfs に移動
 
@@ -71,13 +71,45 @@ cp /usr/bin/busybox rootfs/bin/
 cd ~/umu/step2/initramfs/rootfs/bin
 # busybox を配置した bin ディレクトリに移動
 
-busybox --install -s /bin
-# busybox が提供するコマンド群を /bin にシンボリックリンクとして展開
+busybox --install -s ~/umu/step2/initramfs/rootfs/bin
+# busybox が提供するコマンド群を ~/umu/step2/initramfs/rootfs/bin にシンボリックリンクとして展開
 # 例: ln -s busybox ls, ln -s busybox cat など
 # → initramfs 内で ls, cat, ps, su などが利用可能になる
+# ~/umu/step2/initramfs/rootfs/bin内にBusyBoxのlnによるコマンドが大量にできるので
+# VScodeの.gitignoreファイルで追跡除外を設定
 
 cd ~/umu/step2/initramfs
 # 作業ディレクトリを initramfs のルートに戻す
+- 結果: OK
+- 課題: 特になし
+
+## [2025-12-07 14：37] 3.2 ユーザー構成
+- 実行: /etc/passwd と /etc/shadow を作成する。
+※ /etc/passwd はユーザー情報、/etc/shadow はパスワードハッシュを保持する。
+※ su による root 昇格を計画通り動作させるため、root のパスワードは必須。
+※ パスワードハッシュは openssl や mkpasswd で生成し、ここに埋め込む。
+
+# ~/umu/step2/initramfs/rootfs/etc/passwd
+root:x:0:0:root:/root:/bin/sh        # root ユーザー。ホームは /root、シェルは /bin/sh
+tama:x:1000:1000:tama:/home/tama:/bin/sh  # 一般ユーザー tama。ホームは /home/tama、シェルは /bin/sh
+
+# ~/umu/step2/initramfs/rootfs/etc/shadow
+# フォーマット: 
+# ユーザー名:パスワードハッシュ:最終変更日:最小日数:最大日数:警告日数:非アクティブ:有効期限
+# root のパスワードは必須。tama は任意だが、ログイン時にパスワード入力を求めるなら設定する。
+# パスワードハッシュ生成方法:
+#   1. SHA-512 方式 (openssl)
+#      $ openssl passwd -6
+#      → パスワードを入力すると $6$... 形式のハッシュが出力される
+#
+#   2. yescrypt 方式 (mkpasswd)
+#      $ mkpasswd --method=yescrypt
+#      → パスワードを入力すると $y$j9T$... 形式のハッシュが出力される
+#
+# 生成したハッシュを以下のフィールドに貼り付ける。
+
+root:$y$j9T$exampleRootHashHere:19000:0:99999:7:::   # root のパスワードハッシュ
+tama:$y$j9T$exampleTamaHashHere:19000:0:99999:7:::   # tama のパスワードハッシュ
 - 結果: 
 - 課題: 
 
