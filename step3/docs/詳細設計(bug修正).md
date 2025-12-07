@@ -212,6 +212,15 @@ qemu-system-x86_64 \
   -nographic
 
 
-
-
-  
+# 結果
+うまく起動した。
+## 問題点
+1. suができない
+2. suができないからpoweroffできない（且つ、rootユーザでもpoweroffコマンドが動かない）
+3. tamaUSERでexitするとkernel panic
+   [  535.277051] R13: 0000000000000001 R14: 0000000000000000 R15: 0000000000606720
+   [  535.277051]  </TASK>
+   [  535.277051] Kernel Offset: 0x3aa00000 from 0xffffffff81000000 (relocation range: 0xffffffff80000000-0xffffffffbfffffff)
+   [  535.277051] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000 ]---
+4. kill -kill PID で強制終了することとなる
+5. 
