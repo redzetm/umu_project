@@ -1,4 +1,4 @@
-# Step2バグの再現までの手順
+# step3バグの再現までの手順
 1. 環境準備
 
 1.1 必要パッケージのインストール
@@ -16,13 +16,13 @@ sudo apt install -y build-essential bc bison flex libssl-dev \
 
 1.2 ディレクトリ作成
 
-mkdir -p ~/umu/step2/{kernel,initramfs,iso_root/boot/grub,logs}
+mkdir -p ~/umu/step3/{kernel,initramfs,iso_root/boot/grub,logs}
 
 2. カーネルビルド
 
 2.1 ソース取得
 
-cd ~/umu/step2/kernel
+cd ~/umu/step3/kernel
 wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.6.58.tar.xz
 tar -xf linux-6.6.58.tar.xz
 cd linux-6.6.58
@@ -35,7 +35,7 @@ cd linux-6.6.58
 cd linux-6.6.58
 make mrproper        ※カーネルソースツリーを「完全初期化」する
 make defconfig       ※Linuxカーネルのビルドにおける 「デフォルト設定ファイル（.config）の生成」 を行う
-cp .config ../config-6.6.58     ※バックアップを~/umu/step2/kernelに保存
+cp .config ../config-6.6.58     ※バックアップを~/umu/step3/kernelに保存
 
 2.3 ビルド
 
@@ -47,11 +47,11 @@ make -j$(nproc)
 
 2.4 成果物コピー
 
-cp arch/x86/boot/bzImage ~/umu/step2/iso_root/boot/vmlinuz-6.6.58
-※bzImageをブートイメージとしてvmlinuz-6.6.58として~/umu/step2/iso_root/boot/にコピー
+cp arch/x86/boot/bzImage ~/umu/step3/iso_root/boot/vmlinuz-6.6.58
+※bzImageをブートイメージとしてvmlinuz-6.6.58として~/umu/step3/iso_root/boot/にコピー
 　vmlinuz-6.6.58は、GRUB（ブートローダー）が読み込む。
 
-cp .config ~/umu/step2/iso_root/boot/config-6.6.58
+cp .config ~/umu/step3/iso_root/boot/config-6.6.58
 ※vmlinuz-6.6.58と同じディレクトリに入れてるけど、もしconfig-6.6.58が無くても
 　影響しない。慣例的に同じディレクトリに入れてる
 
@@ -66,17 +66,17 @@ initramfsは、目的は「initramfs（初期RAMファイルシステム）」�
 本格的なルートファイルシステムに切り替える前に、最低限のコマンドや設定を提供する。
 BusyBoxを入れて ls, cat, ps, su などを使えるようにするのが典型的。
 
-cd ~/umu/step2/initramfs
+cd ~/umu/step3/initramfs
 
 mkdir -p rootfs/{bin,sbin,etc,proc,sys,dev,home/tama,root}
 
 cp /usr/bin/busybox rootfs/bin/
 
-cd ~/umu/step2/initramfs/rootfs/bin
+cd ~/umu/step3/initramfs/rootfs/bin
 
 busybox --install -s .
 
-cd ~/umu/step2/initramfs
+cd ~/umu/step3/initramfs
 
 
 3.2 ユーザー構成
@@ -86,11 +86,11 @@ cd ~/umu/step2/initramfs
 ※ su による root 昇格を計画通り動作させるため、root のパスワードは必須。
 ※ パスワードハッシュは openssl や mkpasswd で生成し、ここに埋め込む。
 
-# ~/umu/step2/initramfs/rootfs/etc/passwd    パーミッションは644
+# ~/umu/step3/initramfs/rootfs/etc/passwd    パーミッションは644
 root:x:0:0:root:/root:/bin/sh        # root ユーザー。ホームは /root、シェルは /bin/sh
 tama:x:1000:1000:tama:/home/tama:/bin/sh  # 一般ユーザー tama。ホームは /home/tama、シェルは /bin/sh
 
-# ~/umu/step2/initramfs/rootfs/etc/shadow    パーミッションは600
+# ~/umu/step3/initramfs/rootfs/etc/shadow    パーミッションは600
 # フォーマット: 
 # ユーザー名:パスワードハッシュ:最終変更日:最小日数:最大日数:警告日数:非アクティブ:有効期限
 # root のパスワードは必須。tama は任意だが、ログイン時にパスワード入力を求めるなら設定する。
@@ -114,7 +114,7 @@ tama:$y$j9T$exampleTamaHashHere:19000:0:99999:7:::   # tama のパスワード�
 
 3.3 initスクリプト作成
 
-# ~/umu/step2/initramfs/rootfs/init
+# ~/umu/step3/initramfs/rootfs/init
 
 #!/bin/sh
 
@@ -129,11 +129,11 @@ CMDLINE=$(cat /proc/cmdline)    # GRUB から渡されたカーネルパラメ�
 # --- 起動モードの判定 ---
 if echo "$CMDLINE" | grep -q "single"; then
   # カーネルパラメータに "single" が含まれている場合 → シングルユーザーモード
-  echo "Umu Project Step2: Single-user rescue mode"
+  echo "Umu Project step3: Single-user rescue mode"
   exec /bin/sh                   # root シェルを直接起動（パスワードなしで root ログイン）
 else
   # 通常起動の場合 → マルチユーザーモード
-  echo "Umu Project Step2: Multi-user mode"
+  echo "Umu Project step3: Multi-user mode"
   exec /bin/getty -L ttyS0 115200 vt100   # シリアルコンソールにログインプロンプトを表示
 fi
 
@@ -150,7 +150,7 @@ cp initrd.img-6.6.58 ../iso_root/boot/
 
 4. GRUB設定
 
-# ~/umu/step2/iso_root/boot/grub/grub.cfg
+# ~/umu/step3/iso_root/boot/grub/grub.cfg
 set timeout=10
 set default=0
 
@@ -167,17 +167,17 @@ menuentry "Umu Project rescue 6.6.58" {
 
 5. ISOイメージ作成
 
-cd ~/umu/step2
-grub-mkrescue -o step2-boot.iso iso_root
+cd ~/umu/step3
+grub-mkrescue -o step3-boot.iso iso_root
 
 
 6. QEMU検証
 
-cd ~/umu/step2
+cd ~/umu/step3
 qemu-system-x86_64 \
   -enable-kvm \
   -m 2048 \
-  -cdrom step2-boot.iso \
+  -cdrom step3-boot.iso \
   -nographic
 
 ↑↑↑↑↑↑　　ここで、カーネル起動が止まる　　↑↑↑↑
