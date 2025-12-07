@@ -386,8 +386,9 @@ qemu-system-x86_64 \
   -enable-kvm \
   -m 2048 \
   -cdrom step2-boot.iso \
-  -serial stdio \
   -nographic
+
+
 
 注意点
 - -serial file:logs/serial.log を指定すると、
