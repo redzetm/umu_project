@@ -74,7 +74,6 @@ cp /usr/bin/busybox rootfs/bin/
 
 cd ~/umu/step3/initramfs/rootfs/bin
 
-cd ~/umu/step3/initramfs/rootfs/bin
 
 # BusyBoxコマンドを一度インストール
 busybox --install -s .
@@ -116,8 +115,10 @@ tama:x:1000:1000:tama:/home/tama:/bin/sh  # 一般ユーザー tama。ホーム�
 # roor    パスワードは実験用として  UmuR1207  とする
 # tama    パスワードは実験用として  UmuT1207  とする
 
-root:$y$j9T$exampleRootHashHere:19000:0:99999:7:::   # root のパスワードハッシュ
-tama:$y$j9T$exampleTamaHashHere:19000:0:99999:7:::   # tama のパスワードハッシュ
+root:$6$MJpFJ0jZ26E2H7uo$VTA1fmpPrJz0GRA6eFBzX/fxkW/GbCEOtDm9.MJejBk3FcRH9/dpO8yeGrWMYu0kTgZ/WXdBksggINyUcyjbJ/:19000:0:99999:7:::
+tama:$6$tU0FU0qbwV4pzIb1$GiCtGWu6OInLB9sx3StpxLUazZDbnhPidzHzniAYA3GQ3Xdbt0UFvxEw17oYygLiu9478gPrUkB.zkXevM9Lq/:19000:0:99999:7:::
+
+※ローカル環境で安全
 
 
 
