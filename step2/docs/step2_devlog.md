@@ -194,7 +194,16 @@ menuentry "Umu Project rescue 6.6.58" {
 - 結果: OK
 - 課題: 特になし
 
-
+# [2025-12-07 17:54] 6. QEMU検証
+- 実行: 
+-cd ~/umu/step2
+qemu-system-x86_64 \
+  -enable-kvm \
+  -m 2048 \
+  -cdrom step2-boot.iso \
+  -nographic
+- 結果: kernel panicでinitのあたりで止まる
+- 課題: 改善修正
 
 
 
