@@ -115,7 +115,33 @@ tama:$y$j9T$exampleTamaHashHere:19000:0:99999:7:::   # tama のパスワード�
 - 結果: OK
 - 課題: 特になし
 
+## [2025-12-07 ] 3.3 initスクリプト作成
+- 実行: ~/umu/step2/initramfs/rootfs/init    ※initファイル作成
 
+#!/bin/sh
+
+# --- 仮想ファイルシステムのマウント ---
+mount -t proc none /proc        # プロセス情報を提供する /proc をマウント
+mount -t sysfs none /sys        # カーネルやデバイス情報を提供する /sys をマウント
+mount -t devtmpfs none /dev     # デバイスノードを管理する /dev をマウント
+
+# --- カーネル起動時のコマンドライン引数を取得 ---
+CMDLINE=$(cat /proc/cmdline)    # GRUB から渡されたカーネルパラメータを読み込む
+
+# --- 起動モードの判定 ---
+if echo "$CMDLINE" | grep -q "single"; then
+  # カーネルパラメータに "single" が含まれている場合 → シングルユーザーモード
+  echo "Umu Project Step2: Single-user rescue mode"
+  exec /bin/sh                   # root シェルを直接起動（パスワードなしで root ログイン）
+else
+  # 通常起動の場合 → マルチユーザーモード
+  echo "Umu Project Step2: Multi-user mode"
+  exec /bin/getty -L ttyS0 115200 vt100   # シリアルコンソールにログインプロンプトを表示
+fi
+
+chmod +x rootfs/init    #実行パーミッション追加
+- 結果: 
+- 課題: 
 
 
 
