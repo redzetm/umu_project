@@ -153,7 +153,7 @@ cp initrd.img-6.6.58 ../iso_root/boot/
 - 結果: OK
 - 課題: 特になし
 
-# [2025-12-07 16：50] 4. GRUB設定
+# [2025-12-07 17：06] 4. GRUB設定
 - 実行: # ~/umu/step2/iso_root/boot/grub/grub.cfg
 set timeout=10
 set default=0
@@ -167,8 +167,25 @@ menuentry "Umu Project rescue 6.6.58" {
   linux /boot/vmlinuz-6.6.58 ro single console=ttyS0,115200
   initrd /boot/initrd.img-6.6.58
 }
-- 結果: 
-- 課題: 
+- 結果: OK
+- 課題: 特になし
+
+# [2025-12-07 17：06] 4. GRUB設定
+- 実行: # ~/umu/step2/iso_root/boot/grub/grub.cfg
+set timeout=10
+set default=0
+
+menuentry "Umu Project Linux kernel 6.6.58" {
+  linux /boot/vmlinuz-6.6.58 ro console=ttyS0,115200
+  initrd /boot/initrd.img-6.6.58
+}
+
+menuentry "Umu Project rescue 6.6.58" {
+  linux /boot/vmlinuz-6.6.58 ro single console=ttyS0,115200
+  initrd /boot/initrd.img-6.6.58
+}
+- 結果: OK
+- 課題: 特になし
 
 
 
