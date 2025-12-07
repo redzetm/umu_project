@@ -5,14 +5,12 @@
 # カーネルソース（展開後のディレクトリ）
 step1/kernel/linux-*/
 step2/kernel/linux-*/
+step3/kernel/linux-*/
 
 # カーネルアーカイブ
 step1/kernel/*.tar.xz
-step1/kernel/*.tar.gz
-step1/kernel/*.tar.bz2
 step2/kernel/*.tar.xz
-step2/kernel/*.tar.gz
-step2/kernel/*.tar.bz2
+step3/kernel/*.tar.xz
 
 # initramfs 関連の一時ファイル
 step1/initramfs/modules/
@@ -21,25 +19,34 @@ step1/initramfs/*.img
 step2/initramfs/modules/
 step2/initramfs/extracted/
 step2/initramfs/*.img
+step3/initramfs/modules/
+step3/initramfs/extracted/
+step3/initramfs/*.img
 
 # initramfs 関連の一時ファイル（rootfs 内の bin ディレクトリ）
 step2/initramfs/rootfs/bin/*
+step3/initramfs/rootfs/bin/*
 
 # ISO イメージ
 step1/*.iso
 step1/OVMF_VARS_custom.fd
 step2/*.iso
 step2/OVMF_VARS_custom.fd
+step3/*.iso
+step3/OVMF_VARS_custom.fd
 
 # ログファイル
 step1/logs/*.log
 step2/logs/*.log
+step3/logs/*.log
 
 # ビルド成果物（iso_root 内）
 step1/iso_root/boot/vmlinuz-*
 step1/iso_root/boot/initrd.img-*
 step2/iso_root/boot/vmlinuz-*
 step2/iso_root/boot/initrd.img-*
+step3/iso_root/boot/vmlinuz-*
+step3/iso_root/boot/initrd.img-*
 
 # バックアップディレクトリ
 step1/kernel.backup.*
@@ -48,6 +55,9 @@ step1/iso_root.backup.*
 step2/kernel.backup.*
 step2/initramfs.backup.*
 step2/iso_root.backup.*
+step3/kernel.backup.*
+step3/initramfs.backup.*
+step3/iso_root.backup.*
 
 # エディタの一時ファイル
 *~
