@@ -71,7 +71,8 @@ cp /usr/bin/busybox rootfs/bin/
 cd ~/umu/step2/initramfs/rootfs/bin
 # busybox を配置した bin ディレクトリに移動
 
-busybox --install -s ~/umu/step2/initramfs/rootfs/bin
+# busybox --install -s ~/umu/step2/initramfs/rootfs/bin
+busybox --install -s .
 # busybox が提供するコマンド群を ~/umu/step2/initramfs/rootfs/bin にシンボリックリンクとして展開
 # 例: ln -s busybox ls, ln -s busybox cat など
 # → initramfs 内で ls, cat, ps, su などが利用可能になる
@@ -120,23 +121,29 @@ tama:$y$j9T$exampleTamaHashHere:19000:0:99999:7:::   # tama のパスワード�
 
 #!/bin/sh
 
-# --- 仮想ファイルシステムのマウント ---
-mount -t proc none /proc        # プロセス情報を提供する /proc をマウント
-mount -t sysfs none /sys        # カーネルやデバイス情報を提供する /sys をマウント
-mount -t devtmpfs none /dev     # デバイスノードを管理する /dev をマウント
+# デバッグメッセージを追加
+echo "[DEBUG] Mounting proc, sys, dev..."
+mount -t proc none /proc
+mount -t sysfs none /sys
+mount -t devtmpfs none /dev
 
-# --- カーネル起動時のコマンドライン引数を取得 ---
-CMDLINE=$(cat /proc/cmdline)    # GRUB から渡されたカーネルパラメータを読み込む
+echo "[DEBUG] Reading kernel cmdline..."
+CMDLINE=$(cat /proc/cmdline)
+echo "[DEBUG] CMDLINE=$CMDLINE"
 
-# --- 起動モードの判定 ---
 if echo "$CMDLINE" | grep -q "single"; then
-  # カーネルパラメータに "single" が含まれている場合 → シングルユーザーモード
-  echo "Umu Project Step2: Single-user rescue mode"
-  exec /bin/sh                   # root シェルを直接起動（パスワードなしで root ログイン）
+  echo "[DEBUG] Single-user rescue mode"
+  exec /bin/sh
 else
-  # 通常起動の場合 → マルチユーザーモード
-  echo "Umu Project Step2: Multi-user mode"
-  exec /bin/getty -L ttyS0 115200 vt100   # シリアルコンソールにログインプロンプトを表示
+  echo "[DEBUG] Multi-user mode, starting getty..."
+  
+  # gettyが存在するか確認
+  if [ ! -x /bin/getty ]; then
+    echo "[ERROR] /bin/getty not found or not executable!"
+    exec /bin/sh  # フォールバック
+  fi
+  
+  exec /bin/getty -L ttyS0 115200 vt100
 fi
 
 chmod +x rootfs/init    
@@ -150,23 +157,6 @@ cd rootfs
 find . | cpio -o -H newc | gzip > ../initrd.img-6.6.58
 cd ..
 cp initrd.img-6.6.58 ../iso_root/boot/
-- 結果: OK
-- 課題: 特になし
-
-# [2025-12-07 17：06] 4. GRUB設定
-- 実行: # ~/umu/step2/iso_root/boot/grub/grub.cfg
-set timeout=10
-set default=0
-
-menuentry "Umu Project Linux kernel 6.6.58" {
-  linux /boot/vmlinuz-6.6.58 ro console=ttyS0,115200
-  initrd /boot/initrd.img-6.6.58
-}
-
-menuentry "Umu Project rescue 6.6.58" {
-  linux /boot/vmlinuz-6.6.58 ro single console=ttyS0,115200
-  initrd /boot/initrd.img-6.6.58
-}
 - 結果: OK
 - 課題: 特になし
 
@@ -204,6 +194,82 @@ qemu-system-x86_64 \
   -nographic
 - 結果: kernel panicでinitのあたりで止まる
 - 課題: 改善修正
+
+[    3.722726]  dump_stack_lvl+0x36/0x50
+[    3.722726]  panic+0x174/0x330
+[    3.722726]  do_exit+0x956/0xac0
+[    3.722726]  do_group_exit+0x2c/0x80
+[    3.722726]  __x64_sys_exit_group+0x13/0x20
+[    3.722726]  do_syscall_64+0x39/0x90
+[    3.722726]  entry_SYSCALL_64_after_hwframe+0x78/0xe2
+[    3.722726] RIP: 0033:0x4474cd
+[    3.722726] Code: 66 2e 0f 1f 84 00 00 00 00 00 0f 1f 00 f3 0f 1e fa 48 c7 c6 e0 ff ff ff ba e7 00 00 00 eb 07 66 0f 1f 44 00 00 f4 e
+[    3.722726] RSP: 002b:00007fff43749f28 EFLAGS: 00000202 ORIG_RAX: 00000000000000e7
+[    3.722726] RAX: ffffffffffffffda RBX: 0000000000000001 RCX: 00000000004474cd
+[    3.722726] RDX: 00000000000000e7 RSI: ffffffffffffffe0 RDI: 0000000000000001
+[    3.722726] RBP: 00007fff43749f80 R08: 0000000000000001 R09: 0000000000000007
+[    3.722726] R10: 0000000004f4e700 R11: 0000000000000202 R12: 0000000000000000
+[    3.722726] R13: 0000000000000001 R14: 0000000000000001 R15: 0000000000606720
+[    3.722726]  </TASK>
+[    3.722726] Kernel Offset: 0x400000 from 0xffffffff81000000 (relocation range: 0xffffffff80000000-0xffffffffbfffffff)
+[    3.722726] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100 ]---
+
+ここで止まる
+
+確認
+原因の可能性：
+
+/bin/getty が存在しない、または実行できない
+busyboxにgettyが含まれているか確認が必要。
+回答
+/bin/getty    存在確認済み
+/sbin/getty   存在確認済み
+
+/bin/gettyの依存ライブラリが不足
+busybox-staticを使っているはずだが、initramfs内に正しく配置されているか確認。
+回答
+存在確認済み
+
+initスクリプトのexecが失敗している
+exec /bin/getty -L ttyS0 115200 vt100が失敗すると、initプロセスが終了してkernel panicになる。
+回答
+改善策を知りたいです
+
+パスワードハッシュがexampleRootHashHereのまま
+回答
+ハッシュですでに変更している（GutHubでPublicにしてるからダミーで記載
+
+6. kernel panicの直接原因を特定するための追加ログ
+initスクリプトにデバッグログを追加：
+
+#!/bin/sh
+
+# デバッグメッセージを追加
+echo "[DEBUG] Mounting proc, sys, dev..."
+mount -t proc none /proc
+mount -t sysfs none /sys
+mount -t devtmpfs none /dev
+
+echo "[DEBUG] Reading kernel cmdline..."
+CMDLINE=$(cat /proc/cmdline)
+echo "[DEBUG] CMDLINE=$CMDLINE"
+
+if echo "$CMDLINE" | grep -q "single"; then
+  echo "[DEBUG] Single-user rescue mode"
+  exec /bin/sh
+else
+  echo "[DEBUG] Multi-user mode, starting getty..."
+  
+  # gettyが存在するか確認
+  if [ ! -x /bin/getty ]; then
+    echo "[ERROR] /bin/getty not found or not executable!"
+    exec /bin/sh  # フォールバック
+  fi
+  
+  exec /bin/getty -L ttyS0 115200 vt100
+fi
+回答
+変更した
 
 
 
