@@ -89,17 +89,17 @@ cd ~/umu/step2/initramfs
 ※ su による root 昇格を計画通り動作させるため、root のパスワードは必須。
 ※ パスワードハッシュは openssl や mkpasswd で生成し、ここに埋め込む。
 
-# ~/umu/step2/initramfs/rootfs/etc/passwd
+# ~/umu/step2/initramfs/rootfs/etc/passwd    パーミッションは644
 root:x:0:0:root:/root:/bin/sh        # root ユーザー。ホームは /root、シェルは /bin/sh
 tama:x:1000:1000:tama:/home/tama:/bin/sh  # 一般ユーザー tama。ホームは /home/tama、シェルは /bin/sh
 
-# ~/umu/step2/initramfs/rootfs/etc/shadow
+# ~/umu/step2/initramfs/rootfs/etc/shadow    パーミッションは600
 # フォーマット: 
 # ユーザー名:パスワードハッシュ:最終変更日:最小日数:最大日数:警告日数:非アクティブ:有効期限
 # root のパスワードは必須。tama は任意だが、ログイン時にパスワード入力を求めるなら設定する。
 # パスワードハッシュ生成方法:
 #   1. SHA-512 方式 (openssl)
-#      $ openssl passwd -6
+#      $ openssl passwd -6  ※-6 は SHA-512 (crypt方式) を使うという指定です。
 #      → パスワードを入力すると $6$... 形式のハッシュが出力される
 #
 #   2. yescrypt 方式 (mkpasswd)
@@ -107,11 +107,18 @@ tama:x:1000:1000:tama:/home/tama:/bin/sh  # 一般ユーザー tama。ホーム�
 #      → パスワードを入力すると $y$j9T$... 形式のハッシュが出力される
 #
 # 生成したハッシュを以下のフィールドに貼り付ける。
+# roor    パスワードは実験用として  UmuR1207  とする
+# tama    パスワードは実験用として  UmuT1207  とする
 
 root:$y$j9T$exampleRootHashHere:19000:0:99999:7:::   # root のパスワードハッシュ
 tama:$y$j9T$exampleTamaHashHere:19000:0:99999:7:::   # tama のパスワードハッシュ
-- 結果: 
-- 課題: 
+- 結果: OK
+- 課題: 特になし
+
+
+
+
+
 
 
 
