@@ -187,6 +187,13 @@ menuentry "Umu Project rescue 6.6.58" {
 - 結果: OK
 - 課題: 特になし
 
+# [2025-12-07 17:16] 5. ISOイメージ作成
+- 実行: 
+- cd ~/umu/step2
+- grub-mkrescue -o step2-boot.iso iso_root
+- 結果: OK
+- 課題: 特になし
+
 
 
 
