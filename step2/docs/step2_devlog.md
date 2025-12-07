@@ -120,29 +120,24 @@ tama:$y$j9T$exampleTamaHashHere:19000:0:99999:7:::   # tama のパスワード�
 - 実行: ~/umu/step2/initramfs/rootfs/init    ※initファイル作成
 
 #!/bin/sh
+# filepath: ~/umu/step2/initramfs/rootfs/init
 
-# デバッグメッセージを追加
-echo "[DEBUG] Mounting proc, sys, dev..."
+# 仮想ファイルシステムのマウント
 mount -t proc none /proc
 mount -t sysfs none /sys
 mount -t devtmpfs none /dev
 
-echo "[DEBUG] Reading kernel cmdline..."
+# カーネルコマンドライン引数を取得
 CMDLINE=$(cat /proc/cmdline)
-echo "[DEBUG] CMDLINE=$CMDLINE"
 
+# 起動モード判定
 if echo "$CMDLINE" | grep -q "single"; then
-  echo "[DEBUG] Single-user rescue mode"
+  # シングルユーザーモード（レスキューモード）
+  echo "Umu Project Step2: Single-user rescue mode"
   exec /bin/sh
 else
-  echo "[DEBUG] Multi-user mode, starting getty..."
-  
-  # gettyが存在するか確認
-  if [ ! -x /bin/getty ]; then
-    echo "[ERROR] /bin/getty not found or not executable!"
-    exec /bin/sh  # フォールバック
-  fi
-  
+  # マルチユーザーモード（通常起動）
+  echo "Umu Project Step2: Multi-user mode"
   exec /bin/getty -L ttyS0 115200 vt100
 fi
 
@@ -270,6 +265,23 @@ else
 fi
 回答
 変更した
+
+
+
+# initスクリプトを本番用に修正
+vim ~/umu/step2/initramfs/rootfs/init     修正した
+
+# initramfs再作成
+cd ~/umu/step2/initramfs/rootfs
+find . | cpio -o -H newc | gzip > ../initrd.img-6.6.58
+
+# ISO更新
+cd ~/umu/step2
+cp initramfs/initrd.img-6.6.58 iso_root/boot/
+grub-mkrescue -o step2-boot.iso iso_root
+
+# QEMU検証
+qemu-system-x86_64 -enable-kvm -m 2048 -cdrom step2-boot.iso -nographic
 
 
 
