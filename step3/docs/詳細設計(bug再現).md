@@ -74,7 +74,16 @@ cp /usr/bin/busybox rootfs/bin/
 
 cd ~/umu/step3/initramfs/rootfs/bin
 
+cd ~/umu/step3/initramfs/rootfs/bin
+
+# BusyBoxコマンドを一度インストール
 busybox --install -s .
+
+# 全てのシンボリックリンクを相対パスに修正
+for cmd in $(ls -1 | grep -v "^busybox$"); do
+  rm "$cmd"
+  ln -s busybox "$cmd"
+done
 
 cd ~/umu/step3/initramfs
 
