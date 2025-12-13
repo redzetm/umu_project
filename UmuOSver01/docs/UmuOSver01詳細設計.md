@@ -1,5 +1,16 @@
 # UmuOS var0.1 詳細設計
 
+## 仕様
+- 電源投入からUEFI起動し、Linuxカーネル6.18.1(2025年12月時点で最新LTS版)を起動
+- 自作init（C言語で実装）
+- コマンドは、Busyboxを利用する
+- login IDとpasswordでログイン（ユーザーは、rootユーザー、tamaユーザーの2名）
+- 一応はマルチユーザー仕様
+- ext4ファイルシステムを搭載し、揮発性RAM環境からの脱却
+- 自宅サーバーの仮想マシンマネージャから.isoを読み込み、起動できる仕様
+- telnetで接続できるようにする
+- suコマンド、poweroffコマンドを利用して起動を停止する
+
 1. 環境準備
 1.1 必要パッケージのインストール
 
@@ -26,6 +37,25 @@ cd ~/umu/UmuOSver01/kernel
 wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.1.tar.xz
 tar -xf linux-6.18.1.tar.xz
 cd linux-6.18.1
+
+
+2.2 カーネル設定
+
+今回はデフォルト設定でビルド。
+
+cd linux-6.18.1
+make mrproper        ※カーネルソースツリーを「完全初期化」する
+make defconfig       ※Linuxカーネルのビルドにおける 「デフォルト設定ファイル（.config）の生成」 を行う
+cp .config ../config-6.18.1     ※バックアップを~/umu/UmuOSver01/kernelに保存
+
+2.3 ビルド
+
+make -j$(nproc)
+
+※make -j$(nproc)は、make defconfigで生成した.configを使いカーネルを
+ビルドする。
+
+
 
 
 
