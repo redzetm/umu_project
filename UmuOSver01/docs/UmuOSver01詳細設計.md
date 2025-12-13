@@ -2,6 +2,8 @@
 
 ## 仕様
 - 電源投入からUEFI起動し、Linuxカーネル6.18.1(2025年12月時点で最新版)を起動
+- 起動経路：UEFI → GRUB（UEFI版） → Linux（bzImage + initramfs）
+- 対象アーキテクチャ：x86_64（ arch/x86/boot/bzImage を使用）
 - 自作init（C言語で実装）
 - コマンドは、Busyboxを利用する
 - login IDとpasswordでログイン（ユーザーは、rootユーザー、tamaユーザーの2名）
@@ -67,8 +69,54 @@ cp .config ~/umu/UmuOSver01/iso_root/boot/config-6.18.1
 　影響しない。慣例的に同じディレクトリに入れてる
 
 
+3. initramfs（BusyBox版）
+
+3.1 構造作成
+
+initramfsは、目的は「initramfs（初期RAMファイルシステム）」を構築するための作業場所。
+この中で rootfs/ を作り、bin, etc, dev, proc, sys などのディレクトリを配置して、
+最小限のLinux環境を再現する。
+カーネルが起動直後に展開する「最初のルートファイルシステム」。
+本格的なルートファイルシステムに切り替える前に、最低限のコマンドや設定を提供する。
+BusyBoxを入れて ls, cat, ps, su などを使えるようにするのが典型的。
+
+cd ~/umu/UmuOSver01/initramfs
+
+mkdir -p rootfs/{bin,sbin,etc,proc,sys,dev,home/tama,root}
+
+cp /usr/bin/busybox rootfs/bin/
+
+# BusyBoxの所有者をrootにする（su等で権限が必要なため）
+sudo chown root:root rootfs/bin/busybox
+
+# su を使う場合は BusyBox を setuid root にする（必要に応じて）
+sudo chmod 4755 rootfs/bin/busybox
+
+cd ~/umu/UmuOSver01/initramfs/rootfs/bin
 
 
+# BusyBoxコマンドを一度インストール
+busybox --install -s .
+
+# 全てのシンボリックリンクを相対パスに修正
+for cmd in $(ls -1 | grep -v "^busybox$"); do
+  rm "$cmd"
+  ln -s busybox "$cmd"
+done
+
+cd ~/umu/UmuOSver01/initramfs
+
+# ＜重要＞
+BusyBox の各コマンドは symlink により提供しているが、
+initramfs は実行時に RAM 上へ展開され、ルートディレクトリの
+物理的な位置がビルド時とは異なる。
+
+そのため、（環境によっては）BusyBox が生成する絶対パスの symlink をそのまま使用すると、
+initramfs 展開後にリンク先が存在せず、コマンド実行に失敗する。
+
+この問題を回避するため、全ての BusyBox コマンド symlink は
+同一ディレクトリ内の busybox バイナリを指す相対パスに統一している。
+これにより、initramfs がどのパスに展開されても確実に動作する。
 
 
 
