@@ -119,7 +119,38 @@ initramfs 展開後にリンク先が存在せず、コマンド実行に失敗�
 これにより、initramfs がどのパスに展開されても確実に動作する。
 
 
+3.2 ユーザー構成
 
+/etc/passwd と /etc/shadow を作成する。
+※ /etc/passwd はユーザー情報、/etc/shadow はパスワードハッシュを保持する。
+※ su による root 昇格を計画通り動作させるため、root のパスワードは必須。
+※ パスワードハッシュは openssl や mkpasswd で生成し、ここに埋め込む。
+
+# ~/umu/UmuOSver01/initramfs/rootfs/etc/passwd    パーミッションは644
+root:x:0:0:root:/root:/bin/sh        # root ユーザー。ホームは /root、シェルは /bin/sh
+tama:x:1000:1000:tama:/home/tama:/bin/sh  # 一般ユーザー tama。ホームは /home/tama、シェルは /bin/sh
+
+# ~/umu/UmuOSver01/initramfs/rootfs/etc/shadow    パーミッションは600
+# フォーマット: 
+# ユーザー名:パスワードハッシュ:最終変更日:最小日数:最大日数:警告日数:非アクティブ:有効期限
+# root のパスワードは必須。tama は任意だが、ログイン時にパスワード入力を求めるなら設定する。
+# パスワードハッシュ生成方法:
+#   1. SHA-512 方式 (openssl)
+#      $ openssl passwd -6  ※-6 は SHA-512 (crypt方式) を使うという指定です。
+#      → パスワードを入力すると $6$... 形式のハッシュが出力される
+#
+#   2. yescrypt 方式 (mkpasswd)
+#      $ mkpasswd --method=yescrypt
+#      → パスワードを入力すると $y$j9T$... 形式のハッシュが出力される
+#
+# 生成したハッシュを以下のフィールドに貼り付ける。
+# roor    パスワードは実験用として  UmuR1207  とする
+# tama    パスワードは実験用として  UmuT1207  とする
+
+root:$6$MJpFJ0jZ26E2H7uo$VTA1fmpPrJz0GRA6eFBzX/fxkW/GbCEOtDm9.MJejBk3FcRH9/dpO8yeGrWMYu0kTgZ/WXdBksggINyUcyjbJ/:19000:0:99999:7:::
+tama:$6$tU0FU0qbwV4pzIb1$GiCtGWu6OInLB9sx3StpxLUazZDbnhPidzHzniAYA3GQ3Xdbt0UFvxEw17oYygLiu9478gPrUkB.zkXevM9Lq/:19000:0:99999:7:::
+
+※ローカル環境で安全（一応サンプルのハッシュです）
 
 
 
