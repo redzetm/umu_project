@@ -84,7 +84,7 @@ cd ~/umu/UmuOSver01/initramfs
 
 mkdir -p rootfs/{bin,sbin,etc,proc,sys,dev,home/tama,root}
 
-cp /usr/bin/busybox rootfs/bin/
+cp "$(command -v busybox)" rootfs/bin/
 
 # BusyBoxの所有者をrootにする（su等で権限が必要なため）
 sudo chown root:root rootfs/bin/busybox
@@ -156,38 +156,40 @@ tama:$6$tU0FU0qbwV4pzIb1$GiCtGWu6OInLB9sx3StpxLUazZDbnhPidzHzniAYA3GQ3Xdbt0UFvxE
 
 3.3 initスクリプト作成
 
-# ~/umu/step3/initramfs/rootfs/init
+3.3 init（C言語）作成
 
-#!/bin/sh
+ここでは、Step4までの init シェルスクリプトと同じ動きをする init を C言語で実装し、
+initramfs の /init として配置する。
 
-# --- 仮想ファイルシステムのマウント ---
-mount -t proc none /proc        # プロセス情報を提供する /proc をマウント
-mount -t sysfs none /sys        # カーネルやデバイス情報を提供する /sys をマウント
-mount -t devtmpfs none /dev     # デバイスノードを管理する /dev をマウント
+動作要件（シェル版と同等）:
+- /proc, /sys, /dev をマウント
+- /proc/cmdline に "single" が含まれる場合は /bin/sh を起動
+- 通常は /bin/getty -L ttyS0 115200 vt100 を起動
 
-# --- カーネル起動時のコマンドライン引数を取得 ---
-CMDLINE=$(cat /proc/cmdline)    # GRUB から渡されたカーネルパラメータを読み込む
+ソース配置先（リポジトリ管理用）:
 
-# --- 起動モードの判定 ---
-if echo "$CMDLINE" | grep -q "single"; then
-  # カーネルパラメータに "single" が含まれている場合 → シングルユーザーモード
-  echo "Umu Project step3: Single-user rescue mode"
-  exec /bin/sh                   # root シェルを直接起動（パスワードなしで root ログイン）
-else
-  # 通常起動の場合 → マルチユーザーモード
-  echo "Umu Project step3: Multi-user mode"
-  exec /bin/getty -L ttyS0 115200 vt100   # シリアルコンソールにログインプロンプトを表示
-fi
+# ~/umu/UmuOSver01/initramfs/src/init.c
 
-chmod +x rootfs/init    #実行パーミッション追加　755が良い
+ビルドと配置:
+
+cd ~/umu/UmuOSver01/initramfs
+
+# rootfs 側の /init（PID 1）として配置するため、基本は静的リンクでビルドする
+gcc -static -Os -s -o rootfs/init src/init.c
+
+# 実行パーミッション（/init は 755 推奨）
+chmod 755 rootfs/init
+
+# initramfs へ格納するファイルの所有者を root に揃えたい場合（任意）
+sudo chown root:root rootfs/init
 
 
 3.4 cpioアーカイブ作成
 
 cd rootfs
-find . | cpio -o -H newc | gzip > ../initrd.img-6.6.58
+find . | cpio -o -H newc | gzip > ../initrd.img-6.18.1
 cd ..
-cp initrd.img-6.6.58 ../iso_root/boot/
+cp initrd.img-6.18.1 ../iso_root/boot/
 
 
 
