@@ -1,3 +1,6 @@
+//今回の肝となる init プログラム
+//init プログラムは initramfs の中で最初に実行される
+
 #include <errno.h>      // エラー番号(errno)を使うため
 #include <stdio.h>      // printf / fprintf / puts など
 #include <string.h>     // strerror()（エラー文字列化）
