@@ -152,7 +152,42 @@ tama:$6$tU0FU0qbwV4pzIb1$GiCtGWu6OInLB9sx3StpxLUazZDbnhPidzHzniAYA3GQ3Xdbt0UFvxE
 
 ※ローカル環境で安全（一応サンプルのハッシュです）
 
+#########  ここから12150600   ###############################
 
+3.3 initスクリプト作成
+
+# ~/umu/step3/initramfs/rootfs/init
+
+#!/bin/sh
+
+# --- 仮想ファイルシステムのマウント ---
+mount -t proc none /proc        # プロセス情報を提供する /proc をマウント
+mount -t sysfs none /sys        # カーネルやデバイス情報を提供する /sys をマウント
+mount -t devtmpfs none /dev     # デバイスノードを管理する /dev をマウント
+
+# --- カーネル起動時のコマンドライン引数を取得 ---
+CMDLINE=$(cat /proc/cmdline)    # GRUB から渡されたカーネルパラメータを読み込む
+
+# --- 起動モードの判定 ---
+if echo "$CMDLINE" | grep -q "single"; then
+  # カーネルパラメータに "single" が含まれている場合 → シングルユーザーモード
+  echo "Umu Project step3: Single-user rescue mode"
+  exec /bin/sh                   # root シェルを直接起動（パスワードなしで root ログイン）
+else
+  # 通常起動の場合 → マルチユーザーモード
+  echo "Umu Project step3: Multi-user mode"
+  exec /bin/getty -L ttyS0 115200 vt100   # シリアルコンソールにログインプロンプトを表示
+fi
+
+chmod +x rootfs/init    #実行パーミッション追加　755が良い
+
+
+3.4 cpioアーカイブ作成
+
+cd rootfs
+find . | cpio -o -H newc | gzip > ../initrd.img-6.6.58
+cd ..
+cp initrd.img-6.6.58 ../iso_root/boot/
 
 
 
