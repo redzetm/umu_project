@@ -6,6 +6,10 @@
 #include <string.h>     // strerror()（エラー文字列化）
 #include <unistd.h>     // execv(), pause() など
 #include <sys/mount.h>  // mount() システムコール
+#include <sys/stat.h>   // mkdir()
+#include <sys/types.h>  // pid_t, uid_t, gid_t
+#include <sys/wait.h>   // waitpid()
+#include <dirent.h>     // opendir()/readdir()
 
 /*
  * ファイルシステムをマウントするための関数
@@ -24,6 +28,164 @@ static void mount_fs(const char *source, const char *target, const char *fstype)
         fprintf(stderr,
             "mount(%s -> %s, %s) failed: %s\n",
             source, target, fstype, strerror(errno));
+    }
+}
+
+static void mkdir_if_missing(const char *path, mode_t mode)
+{
+    if (mkdir(path, mode) != 0) {
+        if (errno != EEXIST) {
+            fprintf(stderr, "mkdir(%s) failed: %s\n", path, strerror(errno));
+        }
+    }
+}
+
+static int file_exists(const char *path)
+{
+    return access(path, F_OK) == 0;
+}
+
+static pid_t spawn_argv(const char *path, char *const argv[])
+{
+    pid_t pid = fork();
+    if (pid < 0) {
+        fprintf(stderr, "fork() failed: %s\n", strerror(errno));
+        return -1;
+    }
+    if (pid == 0) {
+        execv(path, argv);
+        fprintf(stderr, "execv(%s) failed: %s\n", path, strerror(errno));
+        _exit(127);
+    }
+    return pid;
+}
+
+static void wait_for_child(pid_t pid)
+{
+    if (pid <= 0) {
+        return;
+    }
+    for (;;) {
+        int status;
+        pid_t r = waitpid(pid, &status, 0);
+        if (r < 0 && errno == EINTR) {
+            continue;
+        }
+        break;
+    }
+}
+
+static int mount_bind(const char *source, const char *target)
+{
+    if (mount(source, target, NULL, MS_BIND | MS_REC, NULL) != 0) {
+        fprintf(stderr, "bind mount(%s -> %s) failed: %s\n", source, target, strerror(errno));
+        return -1;
+    }
+    return 0;
+}
+
+static const char *pick_net_ifname(void)
+{
+    if (file_exists("/sys/class/net/eth0")) {
+        return "eth0";
+    }
+
+    DIR *dir = opendir("/sys/class/net");
+    if (!dir) {
+        return NULL;
+    }
+
+    static char ifname[64];
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != NULL) {
+        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) {
+            continue;
+        }
+        if (strcmp(ent->d_name, "lo") == 0) {
+            continue;
+        }
+        strncpy(ifname, ent->d_name, sizeof(ifname) - 1);
+        ifname[sizeof(ifname) - 1] = '\0';
+        closedir(dir);
+        return ifname;
+    }
+
+    closedir(dir);
+    return NULL;
+}
+
+static void bring_up_network_and_telnet(void)
+{
+    const char *ifname = pick_net_ifname();
+    if (!ifname) {
+        fprintf(stderr, "no network interface found under /sys/class/net\n");
+        return;
+    }
+
+    // loopback up
+    {
+        char *const argv[] = { (char *)"ip", (char *)"link", (char *)"set", (char *)"lo", (char *)"up", NULL };
+        spawn_argv("/bin/ip", argv);
+    }
+
+    // selected interface up
+    {
+        char *const argv[] = { (char *)"ip", (char *)"link", (char *)"set", (char *)"dev", (char *)ifname, (char *)"up", NULL };
+        spawn_argv("/bin/ip", argv);
+    }
+
+    // DHCP (background)
+    if (file_exists("/bin/udhcpc")) {
+        char *const argv[] = { (char *)"udhcpc", (char *)"-i", (char *)ifname, (char *)"-b", (char *)"-q", NULL };
+        spawn_argv("/bin/udhcpc", argv);
+    } else {
+        fprintf(stderr, "/bin/udhcpc not found; skip DHCP\n");
+    }
+
+    // telnetd
+    if (file_exists("/bin/telnetd") && file_exists("/bin/login")) {
+        char *const argv[] = { (char *)"telnetd", (char *)"-l", (char *)"/bin/login", NULL };
+        spawn_argv("/bin/telnetd", argv);
+    } else {
+        fprintf(stderr, "telnetd/login not found; skip telnet\n");
+    }
+}
+
+static void setup_persistent_home(void)
+{
+    const char *candidates[] = { "/dev/vda", "/dev/sda", "/dev/vdb", "/dev/sdb" };
+    const char *device = NULL;
+
+    for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
+        if (file_exists(candidates[i])) {
+            device = candidates[i];
+            break;
+        }
+    }
+
+    if (!device) {
+        fprintf(stderr, "no persistent block device found; skip ext4 mount\n");
+        return;
+    }
+
+    mkdir_if_missing("/persist", 0755);
+    mkdir_if_missing("/persist/home", 0755);
+
+    if (mount(device, "/persist", "ext4", MS_RELATIME, "rw") != 0) {
+        fprintf(stderr, "mount(ext4 %s -> /persist) failed: %s\n", device, strerror(errno));
+        return;
+    }
+
+    // Ensure a usable home exists on first boot
+    mkdir_if_missing("/persist/home/tama", 0755);
+
+    if (mount_bind("/persist/home", "/home") != 0) {
+        return;
+    }
+
+    // Ensure ownership for the normal user
+    if (chown("/home/tama", (uid_t)1000, (gid_t)1000) != 0) {
+        fprintf(stderr, "chown(/home/tama) failed: %s\n", strerror(errno));
     }
 }
 
@@ -99,6 +261,10 @@ int main(void)
     // /dev 以下にデバイスファイルを作るため
     mount_fs("devtmpfs", "/dev", "devtmpfs");
 
+    // telnet/login で pseudo-tty が必要
+    mkdir_if_missing("/dev/pts", 0755);
+    mount_fs("devpts", "/dev/pts", "devpts");
+
     /*
      * --- 起動モードの判定 ---
      */
@@ -126,6 +292,12 @@ int main(void)
         };
 
         puts("UmuOSver01: Multi-user mode");
+
+        // ext4永続化（/home を bind mount）
+        setup_persistent_home();
+
+        // DHCP + telnetd
+        bring_up_network_and_telnet();
 
         // getty を起動
         execv("/bin/getty", argv);
