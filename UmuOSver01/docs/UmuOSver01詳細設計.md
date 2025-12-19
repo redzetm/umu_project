@@ -21,7 +21,7 @@ sudo apt install -y build-essential bc bison flex libssl-dev \
   libelf-dev libncurses-dev dwarves git wget \
   grub-efi-amd64-bin grub-common xorriso mtools \
   qemu-system-x86 ovmf \
-  cpio gzip xz-utils busybox-static
+  cpio gzip xz-utils busybox-static e2fsprogs
 
 ※現在の環境にすでに導入済みのPKGもあるが、Ubuntuでは、上書きは問題ないので
 このコマンドラインでも大丈夫です！
@@ -29,6 +29,9 @@ sudo apt install -y build-essential bc bison flex libssl-dev \
 1.2 ディレクトリ作成
 
 mkdir -p ~/umu/UmuOSver01/{kernel,initramfs,iso_root/boot/grub,logs}
+
+※永続ストレージ（ext4イメージ）用
+mkdir -p ~/umu/UmuOSver01/disk
 
 
 2. カーネルビルド
@@ -82,7 +85,7 @@ BusyBoxを入れて ls, cat, ps, su などを使えるようにするのが典�
 
 cd ~/umu/UmuOSver01/initramfs
 
-mkdir -p rootfs/{bin,sbin,etc,proc,sys,dev,home/tama,root}
+mkdir -p rootfs/{bin,sbin,etc,proc,sys,dev,dev/pts,home/tama,root,persist}
 
 cp "$(command -v busybox)" rootfs/bin/
 
@@ -153,8 +156,6 @@ tama:$6$tU0FU0qbwV4pzIb1$GiCtGWu6OInLB9sx3StpxLUazZDbnhPidzHzniAYA3GQ3Xdbt0UFvxE
 ※ローカル環境で安全（一応サンプルのハッシュです）
 
 
-3.3 initスクリプト作成
-
 3.3 init（C言語）作成
 
 ここでは、Step4までの init シェルスクリプトと同じ動きをする init を C言語で実装し、
@@ -162,6 +163,7 @@ initramfs の /init として配置する。
 
 動作要件（シェル版と同等）:
 - /proc, /sys, /dev をマウント
+- /dev/pts（devpts）をマウント（telnet/login の pseudo-tty 用）
 - /proc/cmdline に "single" が含まれる場合は /bin/sh を起動
 - 通常は /bin/getty -L ttyS0 115200 vt100 を起動
 
@@ -212,5 +214,118 @@ menuentry "Umu Project rescue 6.18.1" {
 
 cd ~/umu/UmuOSver01
 grub-mkrescue -o UmuOSver01-boot.iso iso_root
+
+
+6. 永続ストレージ（ext4）
+
+どのタイミングで ext4 を使えるようにするか：
+- ver0.1：root は initramfs のまま維持し、/home 等を ext4 に載せ替えて永続化する（推奨）
+- ver0.2以降：ext4 を /（ルート）にして switch_root/pivot_root する（発展）
+
+6.1 ext4イメージ作成（ホスト側で作成）
+
+cd ~/umu/UmuOSver01/disk
+truncate -s 2G umuos.ext4.img
+mkfs.ext4 -F -L UMU_PERSIST umuos.ext4.img
+
+※パーティションを切らず「ディスク全体を ext4」として使う（手順を簡単化）。
+
+6.2 virt-manager へ永続ディスクを追加
+
+- VM に Storage を追加し、既存イメージとして umuos.ext4.img を指定
+- バスは VirtIO 推奨（ゲスト側は多くの場合 /dev/vda）
+
+6.3 init（C言語）で ext4 をマウントして永続領域を使う
+
+マウントのタイミング：/proc, /sys, /dev（devtmpfs）が揃い、/dev 配下にブロックデバイスが出現した後。
+
+注意：initramfs だけで動かす構成のため、ext4 と virtio-blk は「モジュール」ではなくカーネルに built-in（=y）で入っている必要がある。
+mount -t ext4 が unknown filesystem になる場合は、.config で以下を確認する。
+- CONFIG_EXT4_FS=y
+- CONFIG_VIRTIO=y / CONFIG_VIRTIO_PCI=y / CONFIG_VIRTIO_BLK=y
+
+起動後に実行されるコマンド相当（検証用）：
+- mkdir -p /persist
+- mount -t ext4 /dev/vda /persist
+- mkdir -p /persist/home
+- mount --bind /persist/home /home
+
+初回起動の補足（推奨）：
+- /persist/home/tama が無い場合は作成し、所有者を 1000:1000（tama）にする
+
+仕様として明記すること（ver0.1）：
+- 永続化対象：/home（少なくとも /home/tama）
+- 永続ディスクが無い/マウント失敗時も起動は継続（ログに残す）
+
+
+7. telnet 接続
+
+目的：ホスト（自宅サーバー）からゲスト UmuOS に telnet 接続してログインできるようにする。
+
+7.1 ネットワーク設定（DHCP）
+
+getty 起動前にネットワークを上げる（BusyBox想定）。
+
+起動後に実行されるコマンド相当：
+- ip link set dev eth0 up   （環境により eth0/ens3 など。最初は eth0 を想定）
+- udhcpc -i eth0
+
+7.2 telnetd 起動
+
+BusyBox の telnetd を利用し、ログインプログラムは /bin/login を使用する。
+
+事前確認（ホスト側で BusyBox の機能を確認）：
+- busybox | grep -E "(telnetd|login|udhcpc|ip)"
+
+起動コマンド例：
+- telnetd -l /bin/login
+
+7.3 ホストから接続
+
+- ゲスト側で ip addr でIP確認
+- ホストから telnet <guest-ip>
+- root / UmuR1207, tama / UmuT1207 でログインできること
+
+7.4 検証（telnet）
+
+目的：telnet接続が「ログインまで」成立していることを確認する。
+
+ゲスト側（コンソール/シリアル）：
+- ps で telnetd が起動していること
+- ip addr / ip route でIPが付与されていること（udhcpc成功）
+
+ホスト側：
+- telnet <guest-ip> で接続し、root/tama それぞれでログインできること
+- tama でログイン後、whoami が tama になること
+
+7.5 検証（マルチユーザー）
+
+目的：同時ログインが成立することを確認する。
+
+- ホストでターミナルを2つ用意し、それぞれ telnet <guest-ip>
+- 片方で root、もう片方で tama でログインできること
+
+
+8. 検証（ext4永続化）
+
+8.1 マウント状態確認（ゲスト側）
+
+- mount で /persist が ext4 としてマウントされていること
+- mount で /home が /persist/home の bind mount になっていること
+- ls -ld /home/tama の所有者が tama (1000) になっていること
+
+8.2 永続化確認（再起動）
+
+手順：
+- tama でログインし、/home/tama にファイルを作成する
+  - 例：echo "persist-test" > /home/tama/persist.txt
+- poweroff で停止 → 再起動
+- 再ログイン後、/home/tama/persist.txt が残っていること
+
+8.3 ディスク未接続時の挙動
+
+手順：
+- virt-manager で ext4ディスク（umuos.ext4.img）を外して起動
+- ログインまで起動が継続すること（永続化はされない）
 
 
