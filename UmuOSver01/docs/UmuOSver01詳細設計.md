@@ -13,6 +13,17 @@
 - telnetで接続できるようにする
 - suコマンド、poweroffコマンドを利用して起動を停止する
 
+### コンソール/表示の前提（重要）
+
+本設計は virt-manager（QEMU/KVM）上での利用を前提に、以下を満たす。
+
+- **TTY（シリアル）接続は必須**：ホスト側からシリアルコンソールに接続してログインできること（例：`ttyS0`）。
+- **画面側（virt-managerの表示）にもログイン手段を用意**：UEFI 環境ではレガシーVGAテキストモードが前提にならないため、
+  Linux の fbcon（フレームバッファコンソール）経由で `tty1` を表示先として用いる。
+
+補足：`console=` カーネルパラメータは「カーネルログ出力先」と「/dev/console（PID1の標準入出力の既定先）」に影響する。
+TTY必須要件を満たすため、/dev/console はシリアル側に寄せる（`console=ttyS0,...` を最後に指定）。
+
 1. 環境準備
 1.1 必要パッケージのインストール
 
@@ -200,14 +211,19 @@ set timeout=20
 set default=0
 
 menuentry "Umu Project Linux kernel 6.18.1" {
-  linux /boot/vmlinuz-6.18.1 ro console=ttyS0,115200
+  linux /boot/vmlinuz-6.18.1 ro console=tty0 console=ttyS0,115200n8
   initrd /boot/initrd.img-6.18.1
 }
 
 menuentry "Umu Project rescue 6.18.1" {
-  linux /boot/vmlinuz-6.18.1 ro single console=ttyS0,115200
+  linux /boot/vmlinuz-6.18.1 ro single console=tty0 console=ttyS0,115200n8
   initrd /boot/initrd.img-6.18.1
 }
+
+### virt-manager 側の要件（TTY接続）
+
+- VM に **Serial** デバイス（例：`pty`）と **Console** を追加する。
+- ホスト側は virsh console <vmname> または割り当てられた pts へ screen <pts> 115200 等で接続し、ttyS0 の getty が表示されること。
 
 
 5. ISOイメージ作成
