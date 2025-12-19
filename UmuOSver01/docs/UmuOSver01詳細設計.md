@@ -176,7 +176,10 @@ initramfs の /init として配置する。
 - /proc, /sys, /dev をマウント
 - /dev/pts（devpts）をマウント（telnet/login の pseudo-tty 用）
 - /proc/cmdline に "single" が含まれる場合は /bin/sh を起動
-- 通常は /bin/getty -L ttyS0 115200 vt100 を起動
+- 通常は getty を複数起動し、**シリアル（ttyS0）は必須**、画面側（tty1）も提供する
+  - 例（BusyBox getty 想定。引数順は「ボーレート→TTY→TERM」）：
+    - `getty -L 115200 ttyS0 vt100`
+    - `getty 0 tty1 linux`
 
 ソース配置先（リポジトリ管理用）:
 
