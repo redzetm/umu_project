@@ -249,8 +249,8 @@ static pid_t start_getty_serial(void)
     char *const argv[] = {
         (char *)"getty",
         (char *)"-L",
-        (char *)"ttyS0",
         (char *)"115200",
+        (char *)"ttyS0",
         (char *)"vt100",
         NULL,
     };
@@ -261,6 +261,7 @@ static pid_t start_getty_tty1(void)
 {
     char *const argv[] = {
         (char *)"getty",
+        (char *)"0",
         (char *)"tty1",
         (char *)"linux",
         NULL,
