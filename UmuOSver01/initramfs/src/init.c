@@ -244,6 +244,30 @@ static void exec_shell(void)
         strerror(errno));
 }
 
+static pid_t start_getty_serial(void)
+{
+    char *const argv[] = {
+        (char *)"getty",
+        (char *)"-L",
+        (char *)"ttyS0",
+        (char *)"115200",
+        (char *)"vt100",
+        NULL,
+    };
+    return spawn_argv("/bin/getty", argv);
+}
+
+static pid_t start_getty_tty1(void)
+{
+    char *const argv[] = {
+        (char *)"getty",
+        (char *)"tty1",
+        (char *)"linux",
+        NULL,
+    };
+    return spawn_argv("/bin/getty", argv);
+}
+
 int main(void)
 {
     /*
@@ -282,15 +306,6 @@ int main(void)
          * getty を起動してログイン待ちにする
          */
 
-        char *const argv[] = {
-            (char *)"getty",   // プログラム名
-            (char *)"-L",      // ローカルライン
-            (char *)"ttyS0",   // シリアルポート
-            (char *)"115200",  // ボーレート
-            (char *)"vt100",   // 端末タイプ
-            NULL,
-        };
-
         puts("UmuOSver01: Multi-user mode");
 
         // ext4永続化（/home を bind mount）
@@ -299,16 +314,29 @@ int main(void)
         // DHCP + telnetd
         bring_up_network_and_telnet();
 
-        // getty を起動
-        execv("/bin/getty", argv);
+        // getty を複数起動（シリアルTTYは必須 + 画面側 tty1 も提供）
+        pid_t getty_serial = start_getty_serial();
+        pid_t getty_tty1 = start_getty_tty1();
 
-        // 失敗した場合はエラー表示
-        fprintf(stderr,
-            "execv(/bin/getty) failed: %s\n",
-            strerror(errno));
+        // PID 1 として子プロセスを回収し、落ちたgettyを再起動する
+        for (;;) {
+            int status;
+            pid_t died = waitpid(-1, &status, 0);
+            if (died < 0) {
+                if (errno == EINTR) {
+                    continue;
+                }
+                fprintf(stderr, "waitpid() failed: %s\n", strerror(errno));
+                pause();
+                continue;
+            }
 
-        // 最後の保険：シェルを起動
-        exec_shell();
+            if (died == getty_serial) {
+                getty_serial = start_getty_serial();
+            } else if (died == getty_tty1) {
+                getty_tty1 = start_getty_tty1();
+            }
+        }
     }
 
     /*
