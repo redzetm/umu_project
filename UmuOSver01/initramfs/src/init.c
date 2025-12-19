@@ -171,7 +171,7 @@ static void setup_persistent_home(void)
     mkdir_if_missing("/persist", 0755);
     mkdir_if_missing("/persist/home", 0755);
 
-    if (mount(device, "/persist", "ext4", MS_RELATIME, "rw") != 0) {
+    if (mount(device, "/persist", "ext4", MS_RELATIME, NULL) != 0) {
         fprintf(stderr, "mount(ext4 %s -> /persist) failed: %s\n", device, strerror(errno));
         return;
     }
