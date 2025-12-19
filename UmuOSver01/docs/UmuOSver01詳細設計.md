@@ -152,7 +152,6 @@ tama:$6$tU0FU0qbwV4pzIb1$GiCtGWu6OInLB9sx3StpxLUazZDbnhPidzHzniAYA3GQ3Xdbt0UFvxE
 
 ※ローカル環境で安全（一応サンプルのハッシュです）
 
-#########  ここから12150600   ###############################
 
 3.3 initスクリプト作成
 
@@ -192,6 +191,26 @@ cd ..
 cp initrd.img-6.18.1 ../iso_root/boot/
 
 
+4. GRUB設定
 
+# ~/umu/UmuOSver01/iso_root/boot/grub/grub.cfg
+set timeout=20
+set default=0
+
+menuentry "Umu Project Linux kernel 6.18.1" {
+  linux /boot/vmlinuz-6.18.1 ro console=ttyS0,115200
+  initrd /boot/initrd.img-6.18.1
+}
+
+menuentry "Umu Project rescue 6.18.1" {
+  linux /boot/vmlinuz-6.18.1 ro single console=ttyS0,115200
+  initrd /boot/initrd.img-6.18.1
+}
+
+
+5. ISOイメージ作成
+
+cd ~/umu/UmuOSver01
+grub-mkrescue -o UmuOSver01-boot.iso iso_root
 
 
