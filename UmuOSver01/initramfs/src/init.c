@@ -81,6 +81,11 @@ static void mount_fs(const char *source, const char *target, const char *fstype)
     // とお願いするシステムコール
     if (mount(source, target, fstype, 0, "") != 0) {
 
+        // switch_root 後など、すでにマウント済みの可能性がある
+        if (errno == EBUSY) {
+            return;
+        }
+
         // 失敗したらエラー内容を表示
         fprintf(stderr,
             "mount(%s -> %s, %s) failed: %s\n",
@@ -181,6 +186,172 @@ static int mount_bind(const char *source, const char *target)
     return -1;
 }
 
+static int is_root_fs_ext4(void)
+{
+    FILE *fp = fopen("/proc/mounts", "r");
+    if (!fp) {
+        return 0;
+    }
+
+    char line[4096];
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        char src[256], mnt[256], fstype[64];
+        if (sscanf(line, "%255s %255s %63s", src, mnt, fstype) != 3) {
+            continue;
+        }
+        if (strcmp(mnt, "/") == 0 && strcmp(fstype, "ext4") == 0) {
+            fclose(fp);
+            return 1;
+        }
+    }
+
+    fclose(fp);
+    return 0;
+}
+
+static const char *pick_root_device(void)
+{
+    // よくある固定候補を優先
+    static const char *static_candidates[] = { "/dev/vda", "/dev/vdb", "/dev/sda", "/dev/sdb" };
+    for (size_t i = 0; i < sizeof(static_candidates) / sizeof(static_candidates[0]); i++) {
+        if (file_exists(static_candidates[i])) {
+            return static_candidates[i];
+        }
+    }
+
+    // /sys/block を見て動的に候補を探す（sr0/cdrom 等は除外）
+    DIR *dir = opendir("/sys/block");
+    if (!dir) {
+        return NULL;
+    }
+
+    static char device_buf[256];
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != NULL) {
+        const char *name = ent->d_name;
+        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+            continue;
+        }
+        if (strncmp(name, "sr", 2) == 0 || strncmp(name, "loop", 4) == 0 || strncmp(name, "ram", 3) == 0) {
+            continue;
+        }
+        if (!(strncmp(name, "vd", 2) == 0 || strncmp(name, "sd", 2) == 0 || strncmp(name, "xvd", 3) == 0)) {
+            continue;
+        }
+
+        int n = snprintf(device_buf, sizeof(device_buf), "/dev/%s", name);
+        if (n > 0 && (size_t)n < sizeof(device_buf) && file_exists(device_buf)) {
+            closedir(dir);
+            return device_buf;
+        }
+    }
+
+    closedir(dir);
+    return NULL;
+}
+
+static void maybe_switch_root_to_ext4(void)
+{
+    // すでに ext4 ルートなら何もしない（stage2 での二重切替防止）
+    if (is_root_fs_ext4()) {
+        return;
+    }
+
+    // 起動直後に /dev がまだ出ていないことがあるのでリトライ
+    const unsigned int total_wait_ms = 10000;
+    const unsigned int step_ms = 100;
+
+    mkdir_if_missing("/newroot", 0755);
+
+    for (unsigned int waited = 0; waited <= total_wait_ms; waited += step_ms) {
+        const char *device = pick_root_device();
+        if (!device) {
+            sleep_ms(step_ms);
+            continue;
+        }
+
+        // ディスク直（/dev/vda）と /dev/vda1 の両方を試す
+        const char *candidates[2];
+        char part_buf[256];
+        candidates[0] = device;
+        int pn = snprintf(part_buf, sizeof(part_buf), "%s1", device);
+        candidates[1] = (pn > 0 && (size_t)pn < sizeof(part_buf) && file_exists(part_buf)) ? part_buf : NULL;
+
+        for (size_t i = 0; i < 2; i++) {
+            const char *cand = candidates[i];
+            if (!cand) {
+                continue;
+            }
+
+            if (mount(cand, "/newroot", "ext4", MS_RELATIME, NULL) != 0) {
+                continue;
+            }
+
+            // ext4 側に init がある場合のみ切替（未セットアップなら fallback）
+            if (file_exists("/newroot/sbin/init") || file_exists("/newroot/init")) {
+                fprintf(stderr, "switch_root to ext4: %s\n", cand);
+                char *const argv[] = {
+                    (char *)"switch_root",
+                    (char *)"/newroot",
+                    (char *)(file_exists("/newroot/sbin/init") ? "/sbin/init" : "/init"),
+                    NULL,
+                };
+                execv("/bin/switch_root", argv);
+                fprintf(stderr, "execv(/bin/switch_root) failed: %s\n", strerror(errno));
+                // exec が失敗した場合は復帰して fallback する
+            }
+
+            // rootfs がまだ入っていない等のケース
+            umount("/newroot");
+        }
+
+        // デバイスは見つかっているが mount/sbin/init が無い
+        break;
+    }
+}
+
+static int read_kv_file_value(const char *path, const char *key, char *out, size_t out_len)
+{
+    if (!path || !key || !out || out_len == 0) {
+        return -1;
+    }
+
+    FILE *fp = fopen(path, "r");
+    if (!fp) {
+        return -1;
+    }
+
+    char line[512];
+    size_t key_len = strlen(key);
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        // strip leading spaces
+        char *p = line;
+        while (*p == ' ' || *p == '\t') {
+            p++;
+        }
+        if (*p == '#' || *p == '\n' || *p == '\0') {
+            continue;
+        }
+
+        // accept key=value
+        if (strncmp(p, key, key_len) != 0 || p[key_len] != '=') {
+            continue;
+        }
+        const char *value = p + key_len + 1;
+        size_t i = 0;
+        while (value[i] != '\0' && value[i] != '\n' && value[i] != '\r' && i + 1 < out_len) {
+            out[i] = value[i];
+            i++;
+        }
+        out[i] = '\0';
+        fclose(fp);
+        return (i > 0) ? 0 : -1;
+    }
+
+    fclose(fp);
+    return -1;
+}
+
 static const char *pick_net_ifname(void)
 {
     if (file_exists("/sys/class/net/eth0")) {
@@ -229,9 +400,32 @@ static void bring_up_network_and_telnet(void)
     char ip_cidr[64];
     char gw[64];
     char dns[64];
-    int has_static_ip = (cmdline_get_value("umuip", ip_cidr, sizeof(ip_cidr)) == 0);
-    int has_gw = (cmdline_get_value("umugw", gw, sizeof(gw)) == 0);
-    int has_dns = (cmdline_get_value("umudns", dns, sizeof(dns)) == 0);
+
+    // 永続設定（ext4 root では /etc が永続）: /etc/umu/net.conf
+    // ただし cmdline の指定があれば一時的上書きとして優先する。
+    const char *net_conf = "/etc/umu/net.conf";
+
+    int has_static_ip = 0;
+    int has_gw = 0;
+    int has_dns = 0;
+
+    if (cmdline_get_value("umuip", ip_cidr, sizeof(ip_cidr)) == 0) {
+        has_static_ip = 1;
+    } else if (read_kv_file_value(net_conf, "umuip", ip_cidr, sizeof(ip_cidr)) == 0) {
+        has_static_ip = 1;
+    }
+
+    if (cmdline_get_value("umugw", gw, sizeof(gw)) == 0) {
+        has_gw = 1;
+    } else if (read_kv_file_value(net_conf, "umugw", gw, sizeof(gw)) == 0) {
+        has_gw = 1;
+    }
+
+    if (cmdline_get_value("umudns", dns, sizeof(dns)) == 0) {
+        has_dns = 1;
+    } else if (read_kv_file_value(net_conf, "umudns", dns, sizeof(dns)) == 0) {
+        has_dns = 1;
+    }
 
     // loopback up
     {
@@ -527,8 +721,20 @@ int main(void)
 
         puts("UmuOSver01: Multi-user mode");
 
-        // ext4永続化（/home を bind mount）
-        setup_persistent_home();
+        // ver0.2: ext4 を / にする場合はここで switch_root
+        maybe_switch_root_to_ext4();
+
+        // ver0.1: ext4永続化（/home を bind mount）
+        // ver0.2: ext4 が / の場合は不要。
+        if (!is_root_fs_ext4()) {
+            setup_persistent_home();
+        } else {
+            mkdir_if_missing("/home", 0755);
+            mkdir_if_missing("/home/tama", 0755);
+            if (chown("/home/tama", (uid_t)1000, (gid_t)1000) != 0) {
+                fprintf(stderr, "chown(/home/tama) failed: %s\n", strerror(errno));
+            }
+        }
 
         // DHCP + telnetd
         bring_up_network_and_telnet();
