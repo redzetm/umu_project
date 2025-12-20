@@ -28,6 +28,7 @@ TTY必須要件を満たすため、/dev/console はシリアル側に寄せる�
 1.1 必要パッケージのインストール
 
 sudo apt update
+
 sudo apt install -y build-essential bc bison flex libssl-dev \
   libelf-dev libncurses-dev dwarves git wget \
   grub-efi-amd64-bin grub-common xorriso mtools \
@@ -50,8 +51,11 @@ mkdir -p ~/umu/UmuOSver01/disk
 2.1 ソース取得
 
 cd ~/umu/UmuOSver01/kernel
+
 wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.1.tar.xz
+
 tar -xf linux-6.18.1.tar.xz
+
 cd linux-6.18.1
 
 補足：カーネルバージョンは固定ではない。以降の手順では例として 6.18.1 のファイル名を使う。
@@ -62,9 +66,13 @@ cd linux-6.18.1
 今回はデフォルト設定でビルド。
 
 cd linux-6.18.1
-make mrproper        ※カーネルソースツリーを「完全初期化」する
-make defconfig       ※Linuxカーネルのビルドにおける 「デフォルト設定ファイル（.config）の生成」 を行う
-cp .config ../config-6.18.1     ※バックアップを~/umu/UmuOSver01/kernelに保存
+make mrproper
+※カーネルソースツリーを「完全初期化」する
+make defconfig
+※Linuxカーネルのビルドにおける 「デフォルト設定ファイル（.config）の生成」 を行う
+
+cp .config ../config-6.18.1
+※バックアップを~/umu/UmuOSver01/kernelに保存
 
 2.3 ビルド
 
@@ -77,12 +85,14 @@ make -j$(nproc)
 2.4 成果物コピー
 
 cp arch/x86/boot/bzImage ~/umu/UmuOSver01/iso_root/boot/vmlinuz-6.18.1
-※bzImageをブートイメージとしてvmlinuz-6.18.1として~/umu/UmuOSver01/iso_root/boot/にコピー
-　vmlinuz-6.18.1は、GRUB（ブートローダー）が読み込む。
+
+※bzImageをブートイメージとしてvmlinuz-6.18.1として~/umu/UmuOSver01/iso_root/boot/にコピー。
+vmlinuz-6.18.1は、GRUB（ブートローダー）が読み込む。
 
 cp .config ~/umu/UmuOSver01/iso_root/boot/config-6.18.1
+
 ※vmlinuz-6.18.1と同じディレクトリに入れてるけど、もしconfig-6.18.1が無くても
-　影響しない。慣例的に同じディレクトリに入れてる
+影響しない。慣例的に同じディレクトリに入れてる
 
 
 3. initramfs（BusyBox版）
@@ -151,6 +161,7 @@ BusyBox のパーサが想定外の文字列を含むと、ログインに失敗
 
 ### ~/umu/UmuOSver01/initramfs/rootfs/etc/passwd    パーミッションは644
 root:x:0:0:root:/root:/bin/sh
+
 tama:x:1000:1000:tama:/home/tama:/bin/sh
 
 ### ~/umu/UmuOSver01/initramfs/rootfs/etc/shadow    パーミッションは600
@@ -170,6 +181,7 @@ tama:x:1000:1000:tama:/home/tama:/bin/sh
 ### root / tama のパスワードは各自で生成して設定する。
 
 root:<ROOT_HASH_HERE>:19000:0:99999:7:::
+
 tama:<TAMA_HASH_HERE>:19000:0:99999:7:::
 
 例：SHA-512 ハッシュ生成（対話入力）
@@ -179,7 +191,9 @@ openssl passwd -6
 所有者・権限（ホスト側で設定してから initrd を作る）:
 
 sudo chown root:root ~/umu/UmuOSver01/initramfs/rootfs/etc/passwd ~/umu/UmuOSver01/initramfs/rootfs/etc/shadow
+
 sudo chmod 644 ~/umu/UmuOSver01/initramfs/rootfs/etc/passwd
+
 sudo chmod 600 ~/umu/UmuOSver01/initramfs/rootfs/etc/shadow
 
 
@@ -199,19 +213,19 @@ initramfs の /init として配置する。
 
 ソース配置先（リポジトリ管理用）:
 
-# ~/umu/UmuOSver01/initramfs/src/init.c
+### ~/umu/UmuOSver01/initramfs/src/init.c
 
 ビルドと配置:
 
 cd ~/umu/UmuOSver01/initramfs
 
-# rootfs 側の /init（PID 1）として配置するため、基本は静的リンクでビルドする
+### rootfs 側の /init（PID 1）として配置するため、基本は静的リンクでビルドする
 gcc -static -Os -s -o rootfs/init src/init.c
 
-# 実行パーミッション（/init は 755 推奨）
+### 実行パーミッション（/init は 755 推奨）
 chmod 755 rootfs/init
 
-# initramfs へ格納するファイルの所有者を root に揃えたい場合（任意）
+### initramfs へ格納するファイルの所有者を root に揃えたい場合（任意）
 sudo chown root:root rootfs/init
 
 
@@ -219,10 +233,12 @@ sudo chown root:root rootfs/init
 
 cd rootfs
 
-# 注意：/etc/shadow を 600（rootのみ読み取り）にするため、initrd 作成は sudo で実行する。
-# VS Code 等のコピペで Markdown リンクが混ざらないよう、ターミナルには生テキストで入力する。
+### 注意：/etc/shadow を 600（rootのみ読み取り）にするため、initrd 作成は sudo で実行する。
+### VS Code 等のコピペで Markdown リンクが混ざらないよう、ターミナルには生テキストで入力する。
 find . -print0 | sudo cpio --null -o -H newc | gzip > ../initrd.img-6.18.1
+
 cd ..
+
 cp initrd.img-6.18.1 ../iso_root/boot/
 
 ここまでで initrd の更新が iso_root に反映された。
@@ -231,6 +247,7 @@ cp initrd.img-6.18.1 ../iso_root/boot/
 ISO再生成（UmuOSver01 で実行）:
 
 cd ~/umu/UmuOSver01
+
 grub-mkrescue -o UmuOSver01-boot.iso iso_root
 
 ローカル起動テスト（QEMU/UEFI）:
@@ -244,6 +261,7 @@ qemu-system-x86_64 ... -serial mon:stdio 2>&1 | tee boot.log
 GUI無し環境（SSH先・DISPLAY無し等）:
 
 cd ~/umu/UmuOSver01
+
 qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
   -drive if=pflash,format=raw,file=/tmp/OVMF_VARS_umuos.fd \
@@ -265,8 +283,9 @@ GUIあり環境（デスクトップ等）：上記から `-display none` を外
 
 4. GRUB設定
 
-# ~/umu/UmuOSver01/iso_root/boot/grub/grub.cfg
+### ~/umu/UmuOSver01/iso_root/boot/grub/grub.cfg
 set timeout=20
+
 set default=0
 
 menuentry "Umu Project Linux kernel 6.18.1" {
@@ -292,6 +311,7 @@ menuentry "Umu Project rescue 6.18.1" {
 1. ISOイメージ作成
 
 cd ~/umu/UmuOSver01
+
 grub-mkrescue -o UmuOSver01-boot.iso iso_root
 
 補足：VS Code などでコマンドを共有/コピーする際、ファイル名が Markdown リンク（例：`[UmuOSver01-boot.iso](...)`）になることがある。
@@ -312,7 +332,9 @@ GUI が使える環境（デスクトップ/virt-manager）では `-display none
 6.1 ext4イメージ作成（ホスト側で作成）
 
 cd ~/umu/UmuOSver01/disk
+
 truncate -s 2G umuos.ext4.img
+
 mkfs.ext4 -F -L UMU_PERSIST umuos.ext4.img
 
 ※パーティションを切らず「ディスク全体を ext4」として使う（手順を簡単化）。
