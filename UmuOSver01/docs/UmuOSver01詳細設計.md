@@ -1,7 +1,7 @@
 # UmuOS var0.1 詳細設計
 
 ## 仕様
-- 電源投入からUEFI起動し、Linuxカーネル6.18.1(2025年12月時点で最新版)を起動
+- 電源投入からUEFI起動し、Linuxカーネル（例：6.18.1）を起動
 - 起動経路：UEFI → GRUB（UEFI版） → Linux（bzImage + initramfs）
 - 対象アーキテクチャ：x86_64（ arch/x86/boot/bzImage を使用）
 - 自作init（C言語で実装）
@@ -53,6 +53,8 @@ cd ~/umu/UmuOSver01/kernel
 wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.1.tar.xz
 tar -xf linux-6.18.1.tar.xz
 cd linux-6.18.1
+
+補足：カーネルバージョンは固定ではない。以降の手順では例として 6.18.1 のファイル名を使う。
 
 
 2.2 カーネル設定
@@ -139,6 +141,7 @@ initramfs 展開後にリンク先が存在せず、コマンド実行に失敗�
 ※ /etc/passwd はユーザー情報、/etc/shadow はパスワードハッシュを保持する。
 ※ su による root 昇格を計画通り動作させるため、root のパスワードは必須。
 ※ パスワードハッシュは openssl や mkpasswd で生成し、ここに埋め込む。
+※ 公開用ドキュメントに実パスワードやハッシュを載せるのは避ける（以下は **テンプレート** とする）。
 
 注意：`/etc/passwd` と `/etc/shadow` は **行末コメントを書かない**（例：`...:/bin/sh # comment` のようにしない）。
 BusyBox のパーサが想定外の文字列を含むと、ログインに失敗したりシェル起動に失敗する。
@@ -164,13 +167,14 @@ tama:x:1000:1000:tama:/home/tama:/bin/sh
 #      → パスワードを入力すると $y$j9T$... 形式のハッシュが出力される
 #
 # 生成したハッシュを以下のフィールドに貼り付ける。
-# roor    パスワードは実験用として  UmuR1207  とする
-# tama    パスワードは実験用として  UmuT1207  とする
+# root / tama のパスワードは各自で生成して設定する。
 
-root:$6$MJpFJ0jZ26E2H7uo$VTA1fmpPrJz0GRA6eFBzX/fxkW/GbCEOtDm9.MJejBk3FcRH9/dpO8yeGrWMYu0kTgZ/WXdBksggINyUcyjbJ/:19000:0:99999:7:::
-tama:$6$tU0FU0qbwV4pzIb1$GiCtGWu6OInLB9sx3StpxLUazZDbnhPidzHzniAYA3GQ3Xdbt0UFvxEw17oYygLiu9478gPrUkB.zkXevM9Lq/:19000:0:99999:7:::
+root:<ROOT_HASH_HERE>:19000:0:99999:7:::
+tama:<TAMA_HASH_HERE>:19000:0:99999:7:::
 
-※ローカル環境で安全（一応サンプルのハッシュです）
+例：SHA-512 ハッシュ生成（対話入力）
+
+openssl passwd -6
 
 所有者・権限（ホスト側で設定してから initrd を作る）:
 
@@ -231,6 +235,12 @@ grub-mkrescue -o UmuOSver01-boot.iso iso_root
 
 ローカル起動テスト（QEMU/UEFI）:
 
+補足：起動ログは基本的にコンソール（virt-manager の表示/シリアル）に出力される。
+syslog/journald は用意していないため、ログをファイルに残したい場合はホスト側で保存する。
+例（ホスト側）：
+
+qemu-system-x86_64 ... -serial mon:stdio 2>&1 | tee boot.log
+
 GUI無し環境（SSH先・DISPLAY無し等）:
 
 cd ~/umu/UmuOSver01
@@ -242,6 +252,13 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
   -nic user,model=virtio-net-pci \
   -display none \
   -serial mon:stdio
+
+補足（環境差の吸収）:
+
+- KVM が使えない環境では `accel=kvm` が失敗するため、`-machine q35,accel=tcg` にする。
+- OVMF のパスはディストリにより異なる。見つからない場合は以下で探索する。
+
+  dpkg -L ovmf | grep -E 'OVMF_(CODE|VARS).*fd$'
 
 GUIあり環境（デスクトップ等）：上記から `-display none` を外す。
 
@@ -276,20 +293,8 @@ grub-mkrescue -o UmuOSver01-boot.iso iso_root
 補足：VS Code などでコマンドを共有/コピーする際、ファイル名が Markdown リンク（例：`[UmuOSver01-boot.iso](...)`）になることがある。
 この形式がコマンドに混ざると bash が `(` を解釈して構文エラーになるため、ターミナルには **生のパス**（例：`UmuOSver01-boot.iso` や `/home/.../UmuOSver01-boot.iso`）のみを入力する。
 
-（任意）ローカルでの QEMU（UEFI）起動例：
-
-cd ~/umu/UmuOSver01
-qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
-  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
-  -drive if=pflash,format=raw,file=/tmp/OVMF_VARS_umuos.fd \
-  -cdrom UmuOSver01-boot.iso -boot d \
-  -drive file=disk/umuos.ext4.img,if=virtio,format=raw \
-  -nic user,model=virtio-net-pci \
-  -display none \
-  -serial mon:stdio
-
 補足：GUI（GTK）が使えない環境では `gtk initialization failed` で起動に失敗する。
-その場合は上記のように `-display none` を付けて「VGAなし（表示なし）」で起動し、シリアル（stdio）でログインする。
+その場合は「3.4 の QEMU 例」のように `-display none` を付けて起動し、シリアル（stdio）でログインする。
 GUI が使える環境（デスクトップ/virt-manager）では `-display none` を外してよい。
 
 
@@ -327,7 +332,9 @@ mount -t ext4 が unknown filesystem になる場合は、.config で以下を�
 - `ls -l /dev/vda`（virtio-blk の想定。環境により /dev/vdb や /dev/sda の可能性もある）
 - `cat /proc/mounts | grep -E ' /persist | /home '`
   - 期待：`/dev/vda /persist ext4 ...`
-  - 期待：`/persist/home /home ...`（bind mount）
+  - 期待：`/home` が ext4 側に載っていること
+    - bind mount の結果は環境により `/proc/mounts` 上で `source` が `/persist/home` ではなく、
+      `/dev/vda /home ext4 ...` のように **デバイス名で表示**されることがある（※正常）。
 
 うまくいかない時の切り分け:
 - `mount(ext4 ... ) failed: No such file or directory` → デバイス名が違う/未出現
@@ -350,6 +357,8 @@ mount -t ext4 が unknown filesystem になる場合は、.config で以下を�
 7. telnet 接続
 
 目的：ホスト（自宅サーバー）からゲスト UmuOS に telnet 接続してログインできるようにする。
+
+注意：telnet は平文であり安全ではない。検証用途（ローカル/隔離ネットワーク）に限定する。
 
 7.1 ネットワーク設定（DHCP）
 
