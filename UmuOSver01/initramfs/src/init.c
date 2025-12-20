@@ -103,11 +103,25 @@ static void wait_for_child(pid_t pid)
 
 static int mount_bind(const char *source, const char *target)
 {
-    if (mount(source, target, NULL, MS_BIND | MS_REC, NULL) != 0) {
-        fprintf(stderr, "bind mount(%s -> %s) failed: %s\n", source, target, strerror(errno));
-        return -1;
+    // Some environments reject MS_REC with bind-mount; try plain MS_BIND first.
+    if (mount(source, target, NULL, MS_BIND, NULL) == 0) {
+        return 0;
     }
-    return 0;
+
+    int first_errno = errno;
+
+    if (mount(source, target, NULL, MS_BIND | MS_REC, NULL) == 0) {
+        fprintf(stderr, "bind mount(%s -> %s) succeeded with MS_REC after retry\n", source, target);
+        return 0;
+    }
+
+    fprintf(stderr,
+        "bind mount(%s -> %s) failed: %s (first try: %s)\n",
+        source,
+        target,
+        strerror(errno),
+        strerror(first_errno));
+    return -1;
 }
 
 static const char *pick_net_ifname(void)
@@ -181,6 +195,7 @@ static void setup_persistent_home(void)
 {
     mkdir_if_missing("/persist", 0755);
     mkdir_if_missing("/persist/home", 0755);
+    mkdir_if_missing("/home", 0755);
 
     // デバイスは起動直後すぐに /dev に現れないことがある（virtio-blk 等）
     // 少し待ってから探索する。
@@ -274,6 +289,10 @@ mounted:
 
     // Ensure a usable home exists on first boot
     mkdir_if_missing("/persist/home/tama", 0755);
+
+    // Target must exist for bind mount
+    mkdir_if_missing("/home", 0755);
+    mkdir_if_missing("/home/tama", 0755);
 
     if (mount_bind("/persist/home", "/home") != 0) {
         return;
