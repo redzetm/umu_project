@@ -50,6 +50,27 @@ static void sleep_ms(unsigned int ms)
     usleep(ms * 1000u);
 }
 
+static void log_sys_block_devices(void)
+{
+    DIR *dir = opendir("/sys/block");
+    if (!dir) {
+        fprintf(stderr, "opendir(/sys/block) failed: %s\n", strerror(errno));
+        return;
+    }
+
+    fprintf(stderr, "available /sys/block devices:\n");
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != NULL) {
+        const char *name = ent->d_name;
+        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+            continue;
+        }
+        fprintf(stderr, "  %s\n", name);
+    }
+
+    closedir(dir);
+}
+
 static pid_t spawn_argv(const char *path, char *const argv[])
 {
     pid_t pid = fork();
@@ -163,7 +184,7 @@ static void setup_persistent_home(void)
 
     // デバイスは起動直後すぐに /dev に現れないことがある（virtio-blk 等）
     // 少し待ってから探索する。
-    const unsigned int total_wait_ms = 3000;
+    const unsigned int total_wait_ms = 10000;
     const unsigned int step_ms = 100;
 
     // まずはよくある固定候補を優先
@@ -172,8 +193,8 @@ static void setup_persistent_home(void)
     // 次に /sys/block を見て動的に候補を集める（sr0/cdrom 等は除外）
     for (unsigned int waited = 0; waited <= total_wait_ms; waited += step_ms) {
         const char *device = NULL;
-        char device_buf[64];
-        char part_buf[64];
+        char device_buf[256];
+        char part_buf[256];
 
         for (size_t i = 0; i < sizeof(static_candidates) / sizeof(static_candidates[0]); i++) {
             if (file_exists(static_candidates[i])) {
@@ -201,8 +222,8 @@ static void setup_persistent_home(void)
                         continue;
                     }
 
-                    snprintf(device_buf, sizeof(device_buf), "/dev/%s", name);
-                    if (file_exists(device_buf)) {
+                    int n = snprintf(device_buf, sizeof(device_buf), "/dev/%s", name);
+                    if (n > 0 && (size_t)n < sizeof(device_buf) && file_exists(device_buf)) {
                         device = device_buf;
                         break;
                     }
@@ -216,6 +237,8 @@ static void setup_persistent_home(void)
             continue;
         }
 
+        fprintf(stderr, "persistent candidate: %s\n", device);
+
         // まずディスク直（mkfs.ext4を /dev/vda に実施している想定）を試す
         if (mount(device, "/persist", "ext4", MS_RELATIME, NULL) == 0) {
             goto mounted;
@@ -224,8 +247,8 @@ static void setup_persistent_home(void)
         int first_errno = errno;
 
         // 次にパーティション構成（/dev/vda1 等）の可能性も試す
-        snprintf(part_buf, sizeof(part_buf), "%s1", device);
-        if (file_exists(part_buf)) {
+        int pn = snprintf(part_buf, sizeof(part_buf), "%s1", device);
+        if (pn > 0 && (size_t)pn < sizeof(part_buf) && file_exists(part_buf)) {
             if (mount(part_buf, "/persist", "ext4", MS_RELATIME, NULL) == 0) {
                 fprintf(stderr, "mounted persistent disk from %s\n", part_buf);
                 goto mounted;
@@ -241,9 +264,13 @@ static void setup_persistent_home(void)
     }
 
     fprintf(stderr, "no persistent block device appeared under /dev; skip ext4 mount\n");
+    log_sys_block_devices();
     return;
 
 mounted:
+
+    // mount(/persist) 後は ext4 のルートに切り替わるため、/persist/home は再作成が必要
+    mkdir_if_missing("/persist/home", 0755);
 
     // Ensure a usable home exists on first boot
     mkdir_if_missing("/persist/home/tama", 0755);
@@ -251,6 +278,8 @@ mounted:
     if (mount_bind("/persist/home", "/home") != 0) {
         return;
     }
+
+    fprintf(stderr, "bind-mounted /persist/home -> /home\n");
 
     // Ensure ownership for the normal user
     if (chown("/home/tama", (uid_t)1000, (gid_t)1000) != 0) {
