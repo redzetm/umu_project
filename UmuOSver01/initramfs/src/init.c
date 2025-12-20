@@ -11,6 +11,63 @@
 #include <sys/wait.h>   // waitpid()
 #include <dirent.h>     // opendir()/readdir()
 
+static int read_cmdline(char *buf, size_t buf_len)
+{
+    if (!buf || buf_len == 0) {
+        return -1;
+    }
+
+    FILE *fp = fopen("/proc/cmdline", "r");
+    if (!fp) {
+        return -1;
+    }
+
+    size_t n = fread(buf, 1, buf_len - 1, fp);
+    fclose(fp);
+    if (n == 0) {
+        return -1;
+    }
+
+    buf[n] = '\0';
+    return 0;
+}
+
+static int cmdline_get_value(const char *key, char *out, size_t out_len)
+{
+    if (!key || !out || out_len == 0) {
+        return -1;
+    }
+
+    char cmdline[4096];
+    if (read_cmdline(cmdline, sizeof(cmdline)) != 0) {
+        return -1;
+    }
+
+    // Look for " key=value" or beginning-of-string "key=value"
+    size_t key_len = strlen(key);
+    const char *p = cmdline;
+
+    for (;;) {
+        const char *hit = strstr(p, key);
+        if (!hit) {
+            return -1;
+        }
+
+        if ((hit == cmdline || hit[-1] == ' ') && hit[key_len] == '=') {
+            const char *value = hit + key_len + 1;
+            size_t i = 0;
+            while (value[i] != '\0' && value[i] != ' ' && i + 1 < out_len) {
+                out[i] = value[i];
+                i++;
+            }
+            out[i] = '\0';
+            return (i > 0) ? 0 : -1;
+        }
+
+        p = hit + 1;
+    }
+}
+
 /*
  * ファイルシステムをマウントするための関数
  *
@@ -157,29 +214,73 @@ static const char *pick_net_ifname(void)
 static void bring_up_network_and_telnet(void)
 {
     const char *ifname = pick_net_ifname();
+
+    // Allow override by kernel cmdline: umuifname=ens3 etc.
+    static char ifname_override[64];
+    if (cmdline_get_value("umuifname", ifname_override, sizeof(ifname_override)) == 0) {
+        ifname = ifname_override;
+    }
+
     if (!ifname) {
         fprintf(stderr, "no network interface found under /sys/class/net\n");
         return;
     }
 
+    char ip_cidr[64];
+    char gw[64];
+    char dns[64];
+    int has_static_ip = (cmdline_get_value("umuip", ip_cidr, sizeof(ip_cidr)) == 0);
+    int has_gw = (cmdline_get_value("umugw", gw, sizeof(gw)) == 0);
+    int has_dns = (cmdline_get_value("umudns", dns, sizeof(dns)) == 0);
+
     // loopback up
     {
         char *const argv[] = { (char *)"ip", (char *)"link", (char *)"set", (char *)"lo", (char *)"up", NULL };
-        spawn_argv("/bin/ip", argv);
+        wait_for_child(spawn_argv("/bin/ip", argv));
     }
 
     // selected interface up
     {
         char *const argv[] = { (char *)"ip", (char *)"link", (char *)"set", (char *)"dev", (char *)ifname, (char *)"up", NULL };
-        spawn_argv("/bin/ip", argv);
+        wait_for_child(spawn_argv("/bin/ip", argv));
     }
 
-    // DHCP (background)
-    if (file_exists("/bin/udhcpc")) {
-        char *const argv[] = { (char *)"udhcpc", (char *)"-i", (char *)ifname, (char *)"-b", (char *)"-q", NULL };
-        spawn_argv("/bin/udhcpc", argv);
+    if (has_static_ip) {
+        fprintf(stderr, "static IP requested: %s dev %s\n", ip_cidr, ifname);
+
+        // ip addr add <IP/CIDR> dev <if>
+        {
+            char *const argv[] = { (char *)"ip", (char *)"addr", (char *)"add", ip_cidr, (char *)"dev", (char *)ifname, NULL };
+            wait_for_child(spawn_argv("/bin/ip", argv));
+        }
+
+        // default route
+        if (has_gw) {
+            char *const argv[] = { (char *)"ip", (char *)"route", (char *)"add", (char *)"default", (char *)"via", gw, (char *)"dev", (char *)ifname, NULL };
+            wait_for_child(spawn_argv("/bin/ip", argv));
+        } else {
+            fprintf(stderr, "static IP set but umugw is missing; skip default route\n");
+        }
+
+        // resolv.conf
+        if (has_dns) {
+            mkdir_if_missing("/etc", 0755);
+            FILE *rf = fopen("/etc/resolv.conf", "w");
+            if (rf) {
+                fprintf(rf, "nameserver %s\n", dns);
+                fclose(rf);
+            } else {
+                fprintf(stderr, "write /etc/resolv.conf failed: %s\n", strerror(errno));
+            }
+        }
     } else {
-        fprintf(stderr, "/bin/udhcpc not found; skip DHCP\n");
+        // DHCP (background)
+        if (file_exists("/bin/udhcpc")) {
+            char *const argv[] = { (char *)"udhcpc", (char *)"-i", (char *)ifname, (char *)"-b", (char *)"-q", NULL };
+            spawn_argv("/bin/udhcpc", argv);
+        } else {
+            fprintf(stderr, "/bin/udhcpc not found; skip DHCP\n");
+        }
     }
 
     // telnetd
