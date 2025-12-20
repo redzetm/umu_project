@@ -96,3 +96,4 @@ step4/iso_root.backup.*
 *.swp
 *.swo
 .DS_Store
+UmuOSver01/initramfs/rootfs/etc/shadow
