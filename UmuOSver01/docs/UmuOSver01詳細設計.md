@@ -456,10 +456,6 @@ BusyBox の telnetd を利用し、ログインプログラムは /bin/login を
 - poweroff で停止 → 再起動
 - 再ログイン後、/home/tama/persist.txt が残っていること
 
-8.3 ディスク未接続時の挙動
 
-手順：
-- virt-manager で ext4ディスク（umuos.ext4.img）を外して起動
-- ログインまで起動が継続すること（永続化はされない）
 
 
