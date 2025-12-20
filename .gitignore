@@ -8,6 +8,7 @@ step2/kernel/linux-*/
 step3/kernel/linux-*/
 step4/kernel/linux-*/
 UmuOSver01/kernel/linux-*/
+UmuOSver011/kernel/linux-*/
 
 # カーネルアーカイブ
 step1/kernel/*.tar.xz
@@ -15,6 +16,7 @@ step2/kernel/*.tar.xz
 step3/kernel/*.tar.xz
 step4/kernel/*.tar.xz
 UmuOSver01/kernel/*.tar.xz
+UmuOSver011/kernel/*.tar.xz
 
 # initramfs 関連の一時ファイル
 step1/initramfs/modules/
@@ -32,15 +34,20 @@ step4/initramfs/*.img
 UmuOSver01/initramfs/modules/
 UmuOSver01/initramfs/extracted/
 UmuOSver01/initramfs/*.img
+UmuOSver011/initramfs/modules/
+UmuOSver011/initramfs/extracted/
+UmuOSver011/initramfs/*.img
 
 # initramfs 関連の一時ファイル（rootfs 内の bin ディレクトリ）
 step2/initramfs/rootfs/bin/*
 step3/initramfs/rootfs/bin/*
 step4/initramfs/rootfs/bin/*
 UmuOSver01/initramfs/rootfs/bin/*
+UmuOSver011/initramfs/rootfs/bin/*
 
 # initramfs のビルド成果物（PID1バイナリなど）
 UmuOSver01/initramfs/rootfs/init
+UmuOSver011/initramfs/rootfs/init
 
 
 # ISO イメージ
@@ -54,6 +61,8 @@ step4/*.iso
 step4/OVMF_VARS_custom.fd
 UmuOSver01/*.iso
 UmuOSver01/OVMF_VARS_custom.fd
+UmuOSver011/*.iso
+UmuOSver011/OVMF_VARS_custom.fd
 
 # ログファイル
 step1/logs/*.log
@@ -61,6 +70,7 @@ step2/logs/*.log
 step3/logs/*.log
 step4/logs/*.log
 UmuOSver01/logs/*.log
+UmuOSver011/logs/*.log
 
 # ビルド成果物（iso_root 内）
 step1/iso_root/boot/vmlinuz-*
@@ -73,9 +83,12 @@ step4/iso_root/boot/vmlinuz-*
 step4/iso_root/boot/initrd.img-*
 UmuOSver01/iso_root/boot/vmlinuz-*
 UmuOSver01/iso_root/boot/initrd.img-*
+UmuOSver011/iso_root/boot/vmlinuz-*
+UmuOSver011/iso_root/boot/initrd.img-*
 
 # 永続ストレージ（ext4イメージ）
 UmuOSver01/disk/*.img
+UmuOSver011/disk/*.img
 
 # バックアップディレクトリ
 step1/kernel.backup.*
@@ -97,3 +110,4 @@ step4/iso_root.backup.*
 *.swo
 .DS_Store
 UmuOSver01/initramfs/rootfs/etc/shadow
+UmuOSver011/initramfs/rootfs/etc/shadow
