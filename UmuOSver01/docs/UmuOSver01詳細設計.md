@@ -102,19 +102,19 @@ mkdir -p rootfs/{bin,sbin,etc,proc,sys,dev,dev/pts,home/tama,root,persist}
 
 cp "$(command -v busybox)" rootfs/bin/
 
-# BusyBoxの所有者をrootにする（su等で権限が必要なため）
+### BusyBoxの所有者をrootにする（su等で権限が必要なため）
 sudo chown root:root rootfs/bin/busybox
 
-# su を使う場合は BusyBox を setuid root にする（必要に応じて）
+### su を使う場合は BusyBox を setuid root にする（必要に応じて）
 sudo chmod 4755 rootfs/bin/busybox
 
 cd ~/umu/UmuOSver01/initramfs/rootfs/bin
 
 
-# BusyBoxコマンドを一度インストール
+### BusyBoxコマンドを一度インストール
 busybox --install -s .
 
-# 全てのシンボリックリンクを相対パスに修正
+### 全てのシンボリックリンクを相対パスに修正
 for cmd in $(ls -1 | grep -v "^busybox$"); do
   rm "$cmd"
   ln -s busybox "$cmd"
@@ -122,7 +122,7 @@ done
 
 cd ~/umu/UmuOSver01/initramfs
 
-# ＜重要＞
+## ＜重要＞
 BusyBox の各コマンドは symlink により提供しているが、
 initramfs は実行時に RAM 上へ展開され、ルートディレクトリの
 物理的な位置がビルド時とは異なる。
@@ -149,25 +149,25 @@ BusyBox のパーサが想定外の文字列を含むと、ログインに失敗
 注意：initramfs に入れるファイルは **root 所有** で固める（cpio でそのままUID/GIDが入る）。
 少なくとも `/etc/passwd` `/etc/shadow` は root 所有にする。
 
-# ~/umu/UmuOSver01/initramfs/rootfs/etc/passwd    パーミッションは644
+### ~/umu/UmuOSver01/initramfs/rootfs/etc/passwd    パーミッションは644
 root:x:0:0:root:/root:/bin/sh
 tama:x:1000:1000:tama:/home/tama:/bin/sh
 
-# ~/umu/UmuOSver01/initramfs/rootfs/etc/shadow    パーミッションは600
-# フォーマット: 
-# ユーザー名:パスワードハッシュ:最終変更日:最小日数:最大日数:警告日数:非アクティブ:有効期限
-# root のパスワードは必須。tama は任意だが、ログイン時にパスワード入力を求めるなら設定する。
-# パスワードハッシュ生成方法:
-#   1. SHA-512 方式 (openssl)
-#      $ openssl passwd -6  ※-6 は SHA-512 (crypt方式) を使うという指定です。
-#      → パスワードを入力すると $6$... 形式のハッシュが出力される
-#
-#   2. yescrypt 方式 (mkpasswd)
-#      $ mkpasswd --method=yescrypt
-#      → パスワードを入力すると $y$j9T$... 形式のハッシュが出力される
-#
-# 生成したハッシュを以下のフィールドに貼り付ける。
-# root / tama のパスワードは各自で生成して設定する。
+### ~/umu/UmuOSver01/initramfs/rootfs/etc/shadow    パーミッションは600
+### フォーマット: 
+### ユーザー名:パスワードハッシュ:最終変更日:最小日数:最大日数:警告日数:非アクティブ:有効期限
+### root のパスワードは必須。tama は任意だが、ログイン時にパスワード入力を求めるなら設定する。
+### パスワードハッシュ生成方法:
+###   1. SHA-512 方式 (openssl)
+###      $ openssl passwd -6  ※-6 は SHA-512 (crypt方式) を使うという指定です。
+###      → パスワードを入力すると $6$... 形式のハッシュが出力される
+###
+###   2. yescrypt 方式 (mkpasswd)
+###     $ mkpasswd --method=yescrypt
+###     → パスワードを入力すると $y$j9T$... 形式のハッシュが出力される
+###
+### 生成したハッシュを以下のフィールドに貼り付ける。
+### root / tama のパスワードは各自で生成して設定する。
 
 root:<ROOT_HASH_HERE>:19000:0:99999:7:::
 tama:<TAMA_HASH_HERE>:19000:0:99999:7:::
