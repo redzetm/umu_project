@@ -282,16 +282,18 @@ menuentry "Umu Project rescue 6.18.1" {
 ### virt-manager 側の要件（TTY接続）
 
 - VM に **Serial** デバイス（例：`pty`）と **Console** を追加する。
-- ホスト側は virsh console <vmname> または割り当てられた pts へ screen <pts> 115200 等で接続し、ttyS0 の getty が表示されること。
+- ホスト側は virsh console <vmname> または割り当てられた pts へ screen <pts> 115200 等で接続し、ttyS0 の 
+  getty が表示されること。
 
 
-5. ISOイメージ作成
+1. ISOイメージ作成
 
 cd ~/umu/UmuOSver01
 grub-mkrescue -o UmuOSver01-boot.iso iso_root
 
 補足：VS Code などでコマンドを共有/コピーする際、ファイル名が Markdown リンク（例：`[UmuOSver01-boot.iso](...)`）になることがある。
-この形式がコマンドに混ざると bash が `(` を解釈して構文エラーになるため、ターミナルには **生のパス**（例：`UmuOSver01-boot.iso` や `/home/.../UmuOSver01-boot.iso`）のみを入力する。
+この形式がコマンドに混ざると bash が `(` を解釈して構文エラーになるため、
+ターミナルには **生のパス**（例：`UmuOSver01-boot.iso` や `/home/.../UmuOSver01-boot.iso`）のみを入力する。
 
 補足：GUI（GTK）が使えない環境では `gtk initialization failed` で起動に失敗する。
 その場合は「3.4 の QEMU 例」のように `-display none` を付けて起動し、シリアル（stdio）でログインする。
@@ -382,7 +384,7 @@ BusyBox の telnetd を利用し、ログインプログラムは /bin/login を
 
 - ゲスト側で ip addr でIP確認
 - ホストから telnet <guest-ip>
-- root / UmuR1207, tama / UmuT1207 でログインできること
+- root / tama それぞれでログインできること（パスワードは 3.2 の /etc/shadow で設定したもの）
 
 7.4 検証（telnet）
 
