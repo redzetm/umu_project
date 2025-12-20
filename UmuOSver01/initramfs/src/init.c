@@ -45,6 +45,11 @@ static int file_exists(const char *path)
     return access(path, F_OK) == 0;
 }
 
+static void sleep_ms(unsigned int ms)
+{
+    usleep(ms * 1000u);
+}
+
 static pid_t spawn_argv(const char *path, char *const argv[])
 {
     pid_t pid = fork();
@@ -153,28 +158,92 @@ static void bring_up_network_and_telnet(void)
 
 static void setup_persistent_home(void)
 {
-    const char *candidates[] = { "/dev/vda", "/dev/sda", "/dev/vdb", "/dev/sdb" };
-    const char *device = NULL;
-
-    for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
-        if (file_exists(candidates[i])) {
-            device = candidates[i];
-            break;
-        }
-    }
-
-    if (!device) {
-        fprintf(stderr, "no persistent block device found; skip ext4 mount\n");
-        return;
-    }
-
     mkdir_if_missing("/persist", 0755);
     mkdir_if_missing("/persist/home", 0755);
 
-    if (mount(device, "/persist", "ext4", MS_RELATIME, NULL) != 0) {
-        fprintf(stderr, "mount(ext4 %s -> /persist) failed: %s\n", device, strerror(errno));
+    // デバイスは起動直後すぐに /dev に現れないことがある（virtio-blk 等）
+    // 少し待ってから探索する。
+    const unsigned int total_wait_ms = 3000;
+    const unsigned int step_ms = 100;
+
+    // まずはよくある固定候補を優先
+    const char *static_candidates[] = { "/dev/vda", "/dev/vdb", "/dev/sda", "/dev/sdb" };
+
+    // 次に /sys/block を見て動的に候補を集める（sr0/cdrom 等は除外）
+    for (unsigned int waited = 0; waited <= total_wait_ms; waited += step_ms) {
+        const char *device = NULL;
+        char device_buf[64];
+        char part_buf[64];
+
+        for (size_t i = 0; i < sizeof(static_candidates) / sizeof(static_candidates[0]); i++) {
+            if (file_exists(static_candidates[i])) {
+                device = static_candidates[i];
+                break;
+            }
+        }
+
+        if (!device) {
+            DIR *dir = opendir("/sys/block");
+            if (dir) {
+                struct dirent *ent;
+                while ((ent = readdir(dir)) != NULL) {
+                    const char *name = ent->d_name;
+                    if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+                        continue;
+                    }
+                    // CD-ROM / loop / ram は対象外
+                    if (strncmp(name, "sr", 2) == 0 || strncmp(name, "loop", 4) == 0 || strncmp(name, "ram", 3) == 0) {
+                        continue;
+                    }
+
+                    // virtio-blk: vda/vdb..., SCSI/SATA: sda/sdb...
+                    if (!(strncmp(name, "vd", 2) == 0 || strncmp(name, "sd", 2) == 0 || strncmp(name, "xvd", 3) == 0)) {
+                        continue;
+                    }
+
+                    snprintf(device_buf, sizeof(device_buf), "/dev/%s", name);
+                    if (file_exists(device_buf)) {
+                        device = device_buf;
+                        break;
+                    }
+                }
+                closedir(dir);
+            }
+        }
+
+        if (!device) {
+            sleep_ms(step_ms);
+            continue;
+        }
+
+        // まずディスク直（mkfs.ext4を /dev/vda に実施している想定）を試す
+        if (mount(device, "/persist", "ext4", MS_RELATIME, NULL) == 0) {
+            goto mounted;
+        }
+
+        int first_errno = errno;
+
+        // 次にパーティション構成（/dev/vda1 等）の可能性も試す
+        snprintf(part_buf, sizeof(part_buf), "%s1", device);
+        if (file_exists(part_buf)) {
+            if (mount(part_buf, "/persist", "ext4", MS_RELATIME, NULL) == 0) {
+                fprintf(stderr, "mounted persistent disk from %s\n", part_buf);
+                goto mounted;
+            }
+        }
+
+        fprintf(stderr, "mount(ext4 %s -> /persist) failed: %s\n", device, strerror(first_errno));
+        if (first_errno == ENODEV) {
+            fprintf(stderr,
+                "hint: ext4 or block driver may be missing (need CONFIG_EXT4_FS=y and virtio-blk built-in for /dev/vd*)\n");
+        }
         return;
     }
+
+    fprintf(stderr, "no persistent block device appeared under /dev; skip ext4 mount\n");
+    return;
+
+mounted:
 
     // Ensure a usable home exists on first boot
     mkdir_if_missing("/persist/home/tama", 0755);
