@@ -140,9 +140,15 @@ initramfs 展開後にリンク先が存在せず、コマンド実行に失敗�
 ※ su による root 昇格を計画通り動作させるため、root のパスワードは必須。
 ※ パスワードハッシュは openssl や mkpasswd で生成し、ここに埋め込む。
 
+注意：`/etc/passwd` と `/etc/shadow` は **行末コメントを書かない**（例：`...:/bin/sh # comment` のようにしない）。
+BusyBox のパーサが想定外の文字列を含むと、ログインに失敗したりシェル起動に失敗する。
+
+注意：initramfs に入れるファイルは **root 所有** で固める（cpio でそのままUID/GIDが入る）。
+少なくとも `/etc/passwd` `/etc/shadow` は root 所有にする。
+
 # ~/umu/UmuOSver01/initramfs/rootfs/etc/passwd    パーミッションは644
-root:x:0:0:root:/root:/bin/sh        # root ユーザー。ホームは /root、シェルは /bin/sh
-tama:x:1000:1000:tama:/home/tama:/bin/sh  # 一般ユーザー tama。ホームは /home/tama、シェルは /bin/sh
+root:x:0:0:root:/root:/bin/sh
+tama:x:1000:1000:tama:/home/tama:/bin/sh
 
 # ~/umu/UmuOSver01/initramfs/rootfs/etc/shadow    パーミッションは600
 # フォーマット: 
@@ -165,6 +171,12 @@ root:$6$MJpFJ0jZ26E2H7uo$VTA1fmpPrJz0GRA6eFBzX/fxkW/GbCEOtDm9.MJejBk3FcRH9/dpO8y
 tama:$6$tU0FU0qbwV4pzIb1$GiCtGWu6OInLB9sx3StpxLUazZDbnhPidzHzniAYA3GQ3Xdbt0UFvxEw17oYygLiu9478gPrUkB.zkXevM9Lq/:19000:0:99999:7:::
 
 ※ローカル環境で安全（一応サンプルのハッシュです）
+
+所有者・権限（ホスト側で設定してから initrd を作る）:
+
+sudo chown root:root ~/umu/UmuOSver01/initramfs/rootfs/etc/passwd ~/umu/UmuOSver01/initramfs/rootfs/etc/shadow
+sudo chmod 644 ~/umu/UmuOSver01/initramfs/rootfs/etc/passwd
+sudo chmod 600 ~/umu/UmuOSver01/initramfs/rootfs/etc/shadow
 
 
 3.3 init（C言語）作成
@@ -202,9 +214,36 @@ sudo chown root:root rootfs/init
 3.4 cpioアーカイブ作成
 
 cd rootfs
-find . | cpio -o -H newc | gzip > ../initrd.img-6.18.1
+
+# 注意：/etc/shadow を 600（rootのみ読み取り）にするため、initrd 作成は sudo で実行する。
+# VS Code 等のコピペで Markdown リンクが混ざらないよう、ターミナルには生テキストで入力する。
+find . -print0 | sudo cpio --null -o -H newc | gzip > ../initrd.img-6.18.1
 cd ..
 cp initrd.img-6.18.1 ../iso_root/boot/
+
+ここまでで initrd の更新が iso_root に反映された。
+次に ISO を再生成し、ローカルで起動確認（任意）する。
+
+ISO再生成（UmuOSver01 で実行）:
+
+cd ~/umu/UmuOSver01
+grub-mkrescue -o UmuOSver01-boot.iso iso_root
+
+ローカル起動テスト（QEMU/UEFI）:
+
+GUI無し環境（SSH先・DISPLAY無し等）:
+
+cd ~/umu/UmuOSver01
+qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+  -drive if=pflash,format=raw,file=/tmp/OVMF_VARS_umuos.fd \
+  -cdrom UmuOSver01-boot.iso -boot d \
+  -drive file=disk/umuos.ext4.img,if=virtio,format=raw \
+  -nic user,model=virtio-net-pci \
+  -display none \
+  -serial mon:stdio
+
+GUIあり環境（デスクトップ等）：上記から `-display none` を外す。
 
 
 4. GRUB設定
@@ -234,6 +273,25 @@ menuentry "Umu Project rescue 6.18.1" {
 cd ~/umu/UmuOSver01
 grub-mkrescue -o UmuOSver01-boot.iso iso_root
 
+補足：VS Code などでコマンドを共有/コピーする際、ファイル名が Markdown リンク（例：`[UmuOSver01-boot.iso](...)`）になることがある。
+この形式がコマンドに混ざると bash が `(` を解釈して構文エラーになるため、ターミナルには **生のパス**（例：`UmuOSver01-boot.iso` や `/home/.../UmuOSver01-boot.iso`）のみを入力する。
+
+（任意）ローカルでの QEMU（UEFI）起動例：
+
+cd ~/umu/UmuOSver01
+qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+  -drive if=pflash,format=raw,file=/tmp/OVMF_VARS_umuos.fd \
+  -cdrom UmuOSver01-boot.iso -boot d \
+  -drive file=disk/umuos.ext4.img,if=virtio,format=raw \
+  -nic user,model=virtio-net-pci \
+  -display none \
+  -serial mon:stdio
+
+補足：GUI（GTK）が使えない環境では `gtk initialization failed` で起動に失敗する。
+その場合は上記のように `-display none` を付けて「VGAなし（表示なし）」で起動し、シリアル（stdio）でログインする。
+GUI が使える環境（デスクトップ/virt-manager）では `-display none` を外してよい。
+
 
 6. 永続ストレージ（ext4）
 
@@ -262,6 +320,18 @@ mkfs.ext4 -F -L UMU_PERSIST umuos.ext4.img
 mount -t ext4 が unknown filesystem になる場合は、.config で以下を確認する。
 - CONFIG_EXT4_FS=y
 - CONFIG_VIRTIO=y / CONFIG_VIRTIO_PCI=y / CONFIG_VIRTIO_BLK=y
+
+補足：起動直後は /dev/vda がまだ出現していないことがあるため、init 側では短時間リトライしてから mount を試みる。
+
+起動後の確認（ゲスト側）:
+- `ls -l /dev/vda`（virtio-blk の想定。環境により /dev/vdb や /dev/sda の可能性もある）
+- `cat /proc/mounts | grep -E ' /persist | /home '`
+  - 期待：`/dev/vda /persist ext4 ...`
+  - 期待：`/persist/home /home ...`（bind mount）
+
+うまくいかない時の切り分け:
+- `mount(ext4 ... ) failed: No such file or directory` → デバイス名が違う/未出現
+- `mount(ext4 ... ) failed: No such device` → ext4/ブロックドライバが built-in でない可能性（上の CONFIG を確認）
 
 起動後に実行されるコマンド相当（検証用）：
 - mkdir -p /persist
