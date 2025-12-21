@@ -145,6 +145,281 @@ ext4を `/` にした後は、原則として “OSの状態” はすべて ext
 - ログ：`/logs/boot.log`（起動ログを追記。ディレクトリは ext4 側に存在させる）
 
 
+3. カーネルビルド（6.18.1）
+
+0.1.1でもカーネルは 6.18.1 を利用し、設定はデフォルト（defconfig）でビルドする。
+
+3.1 ソース取得
+
+```bash
+cd ~/umu/UmuOSver011/kernel
+wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.1.tar.xz
+tar -xf linux-6.18.1.tar.xz
+cd linux-6.18.1
+```
+
+3.2 カーネル設定（デフォルト）
+
+```bash
+make mrproper
+make defconfig
+cp .config ../config-6.18.1
+```
+
+3.3 ビルド
+
+```bash
+make -j$(nproc)
+```
+
+3.4 成果物コピー
+
+```bash
+cp arch/x86/boot/bzImage ~/umu/UmuOSver011/iso_root/boot/vmlinuz-6.18.1
+cp .config ~/umu/UmuOSver011/iso_root/boot/config-6.18.1
+```
+
+
+4. initramfs（移行用）
+
+0.1.1のinitramfsは「ext4の/へ移行（switch_root）」が主目的。
+起動後のログイン・ネット設定・telnet起動は ext4 側の `/sbin/init`（BusyBox init）で行う。
+
+4.1 構造作成
+
+```bash
+cd ~/umu/UmuOSver011/initramfs
+mkdir -p rootfs/{bin,sbin,etc,proc,sys,dev,dev/pts,run,newroot}
+cp "$(command -v busybox)" rootfs/bin/
+sudo chown root:root rootfs/bin/busybox
+```
+
+BusyBoxコマンドのsymlink（相対リンクに統一）
+
+```bash
+cd ~/umu/UmuOSver011/initramfs/rootfs/bin
+busybox --install -s .
+for cmd in $(ls -1 | grep -v "^busybox$"); do
+  rm "$cmd"
+  ln -s busybox "$cmd"
+done
+```
+
+4.2 /init（自作init：C言語）
+
+ここは0.1.1の重要ポイント。
+
+要件（最小）:
+- `/proc` `/sys` `/dev` `/dev/pts` をマウント
+- `/proc/cmdline` から root のUUID（例：`root=UUID=...`）を取得
+- `mount -t ext4 -o rw UUID=<...> /newroot` を実行（必要なら短時間リトライ）
+- `/newroot/logs` を作成し、起動ログを `/newroot/logs/boot.log` に追記（できる範囲で）
+- `switch_root /newroot /sbin/init`
+
+ビルドと配置（例）:
+
+```bash
+cd ~/umu/UmuOSver011/initramfs
+mkdir -p src
+## src/init.c を作成したら
+gcc -static -Os -s -o rootfs/init src/init.c
+chmod 755 rootfs/init
+sudo chown root:root rootfs/init
+```
+
+4.3 initramfs（cpio）作成
+
+```bash
+cd ~/umu/UmuOSver011/initramfs/rootfs
+find . -print0 | sudo cpio --null -o -H newc | gzip > ../initrd.img-6.18.1
+cd ..
+cp initrd.img-6.18.1 ~/umu/UmuOSver011/iso_root/boot/
+```
+
+
+5. ext4ルート（disk.img）へ rootfs を作成
+
+目的：switch_root後に動く「本物の/」を disk.img に用意する。
+（ここに `/sbin/init` `/etc/inittab` `/etc/passwd` `/etc/shadow` `/etc/init.d/rcS` `/logs` 等が必要）
+
+5.1 disk.img 作成（未作成なら）
+
+```bash
+cd ~/umu/UmuOSver011/disk
+truncate -s 2G disk.img
+mkfs.ext4 -F disk.img
+```
+
+5.2 disk.img をホストでマウントして rootfs を作る
+
+```bash
+sudo mkdir -p /mnt/umuos011
+sudo mount -o loop ~/umu/UmuOSver011/disk/disk.img /mnt/umuos011
+```
+
+最低限のディレクトリ:
+
+```bash
+sudo mkdir -p /mnt/umuos011/{bin,sbin,etc,proc,sys,dev,dev/pts,run,root,home/tama,logs,etc/init.d,etc/umu}
+```
+
+BusyBox配置（ext4側）:
+
+```bash
+sudo cp "$(command -v busybox)" /mnt/umuos011/bin/
+sudo chown root:root /mnt/umuos011/bin/busybox
+```
+
+`/sbin/init`（0.1.1は BusyBox init を使う）:
+
+```bash
+sudo ln -sf /bin/busybox /mnt/umuos011/sbin/init
+```
+
+BusyBox applet のsymlink（必要最低限だけでも可）:
+
+```bash
+cd /mnt/umuos011/bin
+sudo ./busybox --install -s .
+```
+
+5.3 ユーザー/認証ファイル（ext4側）
+
+`/mnt/umuos011/etc/passwd`（644）:
+
+```text
+root:x:0:0:root:/root:/bin/sh
+tama:x:1000:1000:tama:/home/tama:/bin/sh
+```
+
+`/mnt/umuos011/etc/shadow`（600）:
+
+```text
+root:<ROOT_HASH_HERE>:19000:0:99999:7:::
+tama:<TAMA_HASH_HERE>:19000:0:99999:7:::
+```
+
+権限:
+
+```bash
+sudo chown root:root /mnt/umuos011/etc/passwd /mnt/umuos011/etc/shadow
+sudo chmod 644 /mnt/umuos011/etc/passwd
+sudo chmod 600 /mnt/umuos011/etc/shadow
+```
+
+5.4 BusyBox init 設定（ext4側）
+
+`/mnt/umuos011/etc/inittab`（最小例）:
+
+```text
+::sysinit:/etc/init.d/rcS
+
+ttyS0::respawn:/sbin/getty -L 115200 ttyS0 vt100
+tty1::respawn:/sbin/getty 0 tty1 linux
+
+::ctrlaltdel:/sbin/reboot
+::shutdown:/bin/umount -a -r
+```
+
+`/mnt/umuos011/etc/init.d/rcS`（起動スクリプト：最小）:
+- `/proc` `/sys` `/dev` `/dev/pts` をマウント（未マウントなら）
+- `/logs/boot.log` に起動ログを追記
+- `ip` コマンドで静的IPを設定（設定ファイルから）
+- 必要時のみ `telnetd -l /bin/login` を起動
+
+※rcSの中身は0.1.1で段階的に作る。まずは「ログとネット」まででOK。
+
+5.5 ネットワーク設定ファイル（ext4側）
+
+`/mnt/umuos011/etc/umu/network.conf`（例）:
+
+```text
+IFNAME=eth0
+IP=192.168.0.204/24
+GW=192.168.0.1
+DNS=8.8.8.8
+```
+
+5.6 マウント解除
+
+```bash
+sudo umount /mnt/umuos011
+```
+
+
+6. GRUB設定
+
+6.1 grub.cfg
+
+作成先：`~/umu/UmuOSver011/iso_root/boot/grub/grub.cfg`
+
+ポイント:
+- `initrd` は initramfs（移行用）
+- `root=UUID=...` は「自作initが読むための情報」として渡す（0.1.1はUUID指定を固定化）
+- `console=tty0 console=ttyS0,115200n8` を付け、virt-managerでもシリアルでも見えるようにする
+
+例:
+
+```cfg
+set timeout=20
+set default=0
+
+menuentry "UmuOS 0.1.1 kernel 6.18.1" {
+  linux /boot/vmlinuz-6.18.1 ro root=UUID=<DISK_UUID_HERE> rootfstype=ext4 rootwait console=tty0 console=ttyS0,115200n8
+  initrd /boot/initrd.img-6.18.1
+}
+
+menuentry "UmuOS 0.1.1 rescue (single)" {
+  linux /boot/vmlinuz-6.18.1 ro single root=UUID=<DISK_UUID_HERE> rootfstype=ext4 rootwait console=tty0 console=ttyS0,115200n8
+  initrd /boot/initrd.img-6.18.1
+}
+```
+
+
+7. ISOイメージ作成
+
+```bash
+cd ~/umu/UmuOSver011
+grub-mkrescue -o UmuOSver011-boot.iso iso_root
+```
+
+
+8. 起動テスト（QEMU）
+
+8.1 disk.imgを接続して起動
+
+```bash
+cd ~/umu/UmuOSver011
+qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+  -drive if=pflash,format=raw,file=/tmp/OVMF_VARS_umuos011.fd \
+  -cdrom UmuOSver011-boot.iso -boot d \
+  -drive file=disk/disk.img,if=virtio,format=raw \
+  -nic user,model=virtio-net-pci \
+  -serial mon:stdio
+```
+
+補足:
+- KVMが使えない場合は `-machine q35,accel=tcg` に変更
+- OVMFのパスは環境差があるため、見つからない場合は `dpkg -L ovmf | grep -E 'OVMF_(CODE|VARS).*fd$'` で探索
+
+
+9. telnet / 静的IP / ログの動作確認
+
+9.1 永続化確認（最小）
+- 起動後に `/home/tama` にファイルを作成し、再起動後も残ること
+
+9.2 ログ確認
+- `/logs/boot.log` が存在し、再起動後も追記されること
+
+9.3 ネット確認
+- `ip addr` / `ip route` で静的IPが設定されていること
+
+9.4 telnet確認
+- `telnet 192.168.0.204` で接続し、root/tamaでログインできること
+
+
+
 
 
 
