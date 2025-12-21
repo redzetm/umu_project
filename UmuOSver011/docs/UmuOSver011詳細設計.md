@@ -48,6 +48,101 @@
 - /logsに起動ログ（例：boot.log）を出力でき、再起動後もログが保持される
 
 
+1. 環境準備
+1.1 必要パッケージのインストール
+
+sudo apt update
+
+sudo apt install -y build-essential bc bison flex libssl-dev \
+  libelf-dev libncurses-dev dwarves git wget \
+  grub-efi-amd64-bin grub-common xorriso mtools \
+  qemu-system-x86 ovmf \
+  cpio gzip xz-utils busybox-static e2fsprogs
+
+※現在の環境にすでに導入済みのPKGもあるが、Ubuntuでは、上書きは問題ないので
+このコマンドラインでも大丈夫です！
+
+1.2 ディレクトリ作成
+
+mkdir -p ~/umu/UmuOSver011/{kernel,initramfs,iso_root/boot/grub,logs}
+
+※永続ストレージ（ext4イメージ）用
+mkdir -p ~/umu/UmuOSver011/disk
+
+
+2. 永続ディスク（ext4の/）設計
+
+## 結論（おすすめ）
+- ISOは「起動するためだけ（ブートローダ + kernel + initramfs）」にし、永続データは別ディスク（disk.img）に持たせる
+- disk.img は raw 形式の ext4 ファイルシステムとして作成し、VMには「追加ディスク」として接続する
+- initramfs（自作init）は disk.img 側の ext4 を UUID 指定で `/` としてマウントし、`switch_root` で移行する
+
+この方式だと「ISOの中身を変えなくても永続化できる」ので、再現性と運用が安定します。
+
+## disk.img の作り方（raw + ext4）
+※まずは一番シンプルに「パーティションを切らず、ディスク全体を ext4 にする」方式で進める。
+
+例：2GBの永続ディスクを作る
+
+```bash
+cd ~/umu/UmuOSver011/disk
+truncate -s 2G disk.img
+mkfs.ext4 -F disk.img
+```
+
+UUIDの確認（どれか一つでOK）
+
+```bash
+sudo blkid -p -o value -s UUID disk.img
+```
+
+（blkidが読めない場合）
+
+```bash
+sudo dumpe2fs -h disk.img | grep -E '^Filesystem UUID:'
+```
+
+## QEMU で disk.img を接続する
+例：disk.img を virtio-blk として追加
+
+```bash
+qemu-system-x86_64 \
+  ...（ISO/UEFI等の既存オプション）... \
+  -drive file=~/umu/UmuOSver011/disk/disk.img,format=raw,if=virtio
+```
+
+VM内では多くの場合 `/dev/vda` などとして見えます（ただし、デバイス名は環境で変わるのでUUIDマウント前提にする）。
+
+## virt-manager で disk.img を接続する
+- VMの「ハードウェアを追加」→「ストレージ」→ 既存のディスクイメージとして `disk.img` を指定
+- バス（またはデバイス）は virtio を推奨
+
+注意：virt-manager が動いているホストが別マシンの場合、ローカルの `disk.img` は参照できません。
+その場合は「同じ作成手順でサーバ側に disk.img を作る」か「scp等で disk.img をサーバに転送」します。
+（“同一ファイルを両方で使う”のは、同一ホスト上で共有パスが見えている場合に限り現実的です）
+
+## initramfs（自作init）がやること（最小）
+0.1.1は安定化優先なので、initramfs側の処理を「/への移行」に集中させる。
+
+1) 早期ログ出力先の確保（/runや/devを整える）
+- `/proc` `/sys` `/dev` をマウント（最低限）
+
+2) 永続ディスクを `/newroot` にマウント
+- `mount -t ext4 -o rw UUID=<disk.imgのUUID> /newroot`
+
+3) switch_root
+- `switch_root /newroot /sbin/init`（0.1.1は BusyBox の switch_root 実装を利用）
+
+## 永続化される「実体」の置き場所（案）
+ext4を `/` にした後は、原則として “OSの状態” はすべて ext4 側の `/` に置く。
+
+- ユーザー/認証：`/etc/passwd` `/etc/shadow`
+- 起動とサービス：`/sbin/init`（BusyBox） + `/etc/inittab`（BusyBox init用）
+- ネット設定（静的IPの実体）：`/etc/umu/network.conf`（自作の単純な設定ファイル）
+  - 例：`IP=192.168.0.204/24` `GW=192.168.0.1` `DNS=8.8.8.8`
+  - 適用は `/etc/init.d/rcS` 等（起動スクリプト）から `ip` コマンドで実施
+- telnet：`/etc/init.d/rcS` 等で `telnetd` を起動（必要時のみ有効化できるようフラグ化する）
+- ログ：`/logs/boot.log`（起動ログを追記。ディレクトリは ext4 側に存在させる）
 
 
 
