@@ -141,7 +141,7 @@ ext4を `/` にした後は、原則として “OSの状態” はすべて ext
 - ユーザー/認証：`/etc/passwd` `/etc/shadow`
 - 起動とサービス：`/sbin/init`（BusyBox） + `/etc/inittab`（BusyBox init用）
 - ネット設定（静的IPの実体）：`/etc/umu/network.conf`（自作の単純な設定ファイル）
-  - 例：`IP=192.168.0.204/24` `GW=192.168.0.1` `DNS=8.8.8.8`
+  - 例：`IP=192.168.0.204/24` `GW=192.168.0.1` `DNS=8.8.8.8` `TELNET_ENABLE=0`
   - 適用は `/etc/init.d/rcS` 等（起動スクリプト）から `ip` コマンドで実施
 - telnet：`/etc/init.d/rcS` 等で `telnetd` を起動（必要時のみ有効化できるようフラグ化する）
 - ログ：`/logs/boot.log`（起動ログを追記。ディレクトリは ext4 側に存在させる）
@@ -192,7 +192,9 @@ cp .config ~/umu/UmuOSver011/iso_root/boot/config-6.18.1
 ```bash
 cd ~/umu/UmuOSver011/initramfs
 mkdir -p rootfs/{bin,sbin,etc,proc,sys,dev,dev/pts,run,newroot}
-cp "$(command -v busybox)" rootfs/bin/
+# initramfs内では BusyBox が「静的」である必要がある。
+# Ubuntuで busybox-static を入れている前提なら /bin/busybox を使う。
+cp /bin/busybox rootfs/bin/
 sudo chown root:root rootfs/bin/busybox
 ```
 
@@ -268,7 +270,7 @@ sudo mkdir -p /mnt/umuos011/{bin,sbin,etc,proc,sys,dev,dev/pts,run,root,home/tam
 BusyBox配置（ext4側）:
 
 ```bash
-sudo cp "$(command -v busybox)" /mnt/umuos011/bin/
+sudo cp /bin/busybox /mnt/umuos011/bin/
 sudo chown root:root /mnt/umuos011/bin/busybox
 ```
 
@@ -301,6 +303,12 @@ root:<ROOT_HASH_HERE>:19000:0:99999:7:::
 tama:<TAMA_HASH_HERE>:19000:0:99999:7:::
 ```
 
+`<ROOT_HASH_HERE>` / `<TAMA_HASH_HERE>` の作り方（例: SHA-512）:
+
+```bash
+openssl passwd -6
+```
+
 権限:
 
 ```bash
@@ -331,6 +339,76 @@ tty1::respawn:/sbin/getty 0 tty1 linux
 
 ※rcSの中身は0.1.1で段階的に作る。まずは「ログとネット」まででOK。
 
+rcS（本番用）:
+
+```sh
+#!/bin/sh
+
+PATH=/sbin:/bin
+
+log() {
+  echo "$1" >> /logs/boot.log
+}
+
+mkdir -p /logs
+log "[rcS] boot: $(date)"
+
+# 依存FS（未マウントなら）
+mkdir -p /proc /sys /dev /dev/pts
+grep -q " /proc " /proc/mounts 2>/dev/null || mount -t proc proc /proc
+grep -q " /sys "  /proc/mounts 2>/dev/null || mount -t sysfs sys /sys
+grep -q " /dev "  /proc/mounts 2>/dev/null || mount -t devtmpfs dev /dev
+mkdir -p /dev/pts
+grep -q " /dev/pts " /proc/mounts 2>/dev/null || mount -t devpts devpts /dev/pts
+
+mkdir -p /etc/umu
+
+# ---- ネットワーク（静的IP）----
+# network.conf は KEY=VALUE 形式を想定（例は 5.5 を参照）
+CONF=/etc/umu/network.conf
+
+# デフォルト値（必要なら変更）
+IFNAME=eth0
+TELNET_ENABLE=0
+
+if [ -f "$CONF" ]; then
+  . "$CONF"
+fi
+
+if [ -z "$IP" ] || [ -z "$GW" ]; then
+  log "[rcS] net: skip (IP/GW not set)"
+else
+  ip link set "$IFNAME" up
+
+  # 冪等化: 同じIPが既に付いていれば追加しない
+  if ! ip addr show dev "$IFNAME" | grep -Fq "inet $IP"; then
+    ip addr add "$IP" dev "$IFNAME"
+  fi
+
+  # 冪等化: default route は replace で上書き
+  ip route replace default via "$GW" dev "$IFNAME"
+
+  if [ -n "$DNS" ]; then
+    echo "nameserver $DNS" > /etc/resolv.conf
+  fi
+
+  log "[rcS] net: IF=$IFNAME IP=$IP GW=$GW DNS=$DNS"
+fi
+
+# ---- telnet（必要時のみ）----
+if [ "$TELNET_ENABLE" = "1" ]; then
+  telnetd -l /bin/login
+  log "[rcS] telnetd started"
+fi
+```
+
+権限（ext4側）:
+
+```bash
+sudo chmod 755 /mnt/umuos011/etc/init.d/rcS
+sudo chown root:root /mnt/umuos011/etc/init.d/rcS
+```
+
 5.5 ネットワーク設定ファイル（ext4側）
 
 `/mnt/umuos011/etc/umu/network.conf`（例）:
@@ -340,6 +418,7 @@ IFNAME=eth0
 IP=192.168.0.204/24
 GW=192.168.0.1
 DNS=8.8.8.8
+TELNET_ENABLE=0
 ```
 
 5.6 マウント解除
@@ -388,7 +467,10 @@ grub-mkrescue -o UmuOSver011-boot.iso iso_root
 
 8. 起動テスト（QEMU）
 
-8.1 disk.imgを接続して起動
+8.1 起動のみ確認（ローカルQEMU / ネットワーク不要）
+
+ローカル環境で「kernel + initramfs + switch_root + ext4の/」までを確認するだけなら、
+ネットワークは不要。ブリッジ設定に依存しないため、この方式が最も簡単。
 
 ```bash
 cd ~/umu/UmuOSver011
@@ -397,11 +479,62 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
   -drive if=pflash,format=raw,file=/tmp/OVMF_VARS_umuos011.fd \
   -cdrom UmuOSver011-boot.iso -boot d \
   -drive file=disk/disk.img,if=virtio,format=raw \
-  -nic user,model=virtio-net-pci \
+  -nic none \
+  -serial mon:stdio
+```
+
+8.2 静的IP/telnetまで確認（ブリッジが必要）
+
+仕様として「DHCPなし・静的IP（`192.168.0.204/24`）」および「telnet接続」を成立させるには、
+ゲストがLANにぶら下がる必要があるため、virt-manager本番と同様にブリッジ接続を用いる。
+
+（※ローカルQEMUでもブリッジを張れれば同等に再現できる）
+
+注記:
+- 以下のコマンドは「virt-managerではなく、ホスト上で `qemu-system-x86_64` を直接実行する」場合の任意手順
+- 実行するディレクトリは固定ではない（例として `~/umu/UmuOSver011` を使っているだけ）
+  - `UmuOSver011-boot.iso` と `disk/disk.img` のパスが解決できる場所に合わせて、`cd` や `-cdrom` / `-drive file=...` のパスを調整する
+  - virt-manager で起動する場合は、このコマンドは実行せず、GUI側で ISO と disk.img とブリッジNICを設定して起動する
+
+推奨の進め方（段階的に切り分け）:
+- まずは 8.1（`-nic none`）で「起動 + switch_root + ext4が/」を確認できたら成功とする
+- 次の工程として virt-manager 本番で ISO と disk.img をセットして起動し、LAN上の疎通を確認する
+- 疎通確認の最初は virt-manager のコンソールから手動で切り分けしてよい
+  - ここで言う「手動」は 2種類ある点に注意
+    - `ip addr add ...` のようなコマンド直打ち（ランタイム設定）: 再起動すると消える（受入基準の“保持”は満たさない）
+    - ext4側のファイルを編集して反映する: 変更自体は ext4 に残る
+      - 例：`/etc/umu/network.conf` を作り、`/etc/init.d/rcS` で起動時に `ip` を実行する
+  - 受入基準（再起動後もネット設定が保持される）を満たすには、最終的に ext4 側の起動処理（例：`/etc/init.d/rcS`）で自動適用する
+
+```bash
+cd ~/umu/UmuOSver011
+qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+  -drive if=pflash,format=raw,file=/tmp/OVMF_VARS_umuos011.fd \
+  -cdrom UmuOSver011-boot.iso -boot d \
+  -drive file=disk/disk.img,if=virtio,format=raw \
+  -nic bridge,br=br0,model=virtio-net-pci \
   -serial mon:stdio
 ```
 
 補足:
+- `br0` はホスト環境のブリッジ名に合わせて変更する（例：`br0`/`virbr0` 等）
+- ブリッジ前提のため、ゲストの静的IP（`192.168.0.204/24`）はホストLAN側のセグメントと一致している必要がある
+
+
+8.3 共通の補足
+
+```bash
+cd ~/umu/UmuOSver011
+qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+  -drive if=pflash,format=raw,file=/tmp/OVMF_VARS_umuos011.fd \
+  -cdrom UmuOSver011-boot.iso -boot d \
+  -drive file=disk/disk.img,if=virtio,format=raw \
+  -nic bridge,br=br0,model=virtio-net-pci \
+  -serial mon:stdio
+```
+
 - KVMが使えない場合は `-machine q35,accel=tcg` に変更
 - OVMFのパスは環境差があるため、見つからない場合は `dpkg -L ovmf | grep -E 'OVMF_(CODE|VARS).*fd$'` で探索
 
@@ -417,8 +550,34 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
 9.3 ネット確認
 - `ip addr` / `ip route` で静的IPが設定されていること
 
+永続化確認（ネット設定）:
+- 一度再起動し、手動で `ip addr add ...` などを打たなくても 9.3 が成立すること
+
+補足（初回の疎通確認として「手動設定」で切り分けしたい場合）:
+
+※以下は「virt-managerのブリッジ接続が正しく、ゲストがLANに出られるか」を素早く確認するための手順。
+最終的には ext4 側の `rcS` に落とし込み、再起動後も自動適用される状態にする。
+
+```sh
+IF=eth0
+ip link set "$IF" up
+ip addr add 192.168.0.204/24 dev "$IF"
+ip route add default via 192.168.0.1
+echo 'nameserver 8.8.8.8' > /etc/resolv.conf
+```
+
 9.4 telnet確認
 - `telnet 192.168.0.204` で接続し、root/tamaでログインできること
+
+補足（手動でtelnetを立ち上げて疎通確認する場合）:
+
+```sh
+telnetd -l /bin/login
+```
+
+補足（実行環境の前提）:
+- 本番運用（virt-manager）はブリッジ接続を前提とする
+- ローカルQEMU起動は補助的なテスト用途だが、静的IP要件を満たすにはブリッジ相当の接続が必要
 
 
 
