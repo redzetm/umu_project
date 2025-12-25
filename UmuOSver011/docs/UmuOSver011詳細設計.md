@@ -254,7 +254,7 @@ cp initrd.img-6.18.1 ~/umu/UmuOSver011/iso_root/boot/
 目的：switch_root後に動く「本物の/」を disk.img に用意する。
 （ここに `/sbin/init` `/etc/inittab` `/etc/passwd` `/etc/shadow` `/etc/init.d/rcS` `/logs` 等が必要）
 
-5.1 disk.img 作成（未作成なら）
+5.1 disk.img 作成（未作成なら）※手順書通りに実装した場合は、5.1は実施不要
 
 ```bash
 cd ~/umu/UmuOSver011/disk
@@ -263,6 +263,10 @@ mkfs.ext4 -F disk.img
 ```
 
 5.2 disk.img をホストでマウントして rootfs を作る
+
+※この作業は「どのディレクトリで実行してもOK」。`/mnt/umuos011` はホスト上の絶対パスのマウントポイントなので、
+作業ディレクトリ（`cd` している場所）には依存しない。
+（以降はマウントポイント名を `/mnt/umuos011` に統一）
 
 ```bash
 sudo mkdir -p /mnt/umuos011
