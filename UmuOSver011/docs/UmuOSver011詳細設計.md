@@ -498,12 +498,14 @@ grub-mkrescue -o UmuOSver011-boot.iso iso_root
 
 ```bash
 cd ~/umu/UmuOSver011
+
 qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
   -drive if=pflash,format=raw,file=/tmp/OVMF_VARS_umuos011.fd \
   -cdrom UmuOSver011-boot.iso -boot d \
   -drive file=disk/disk.img,if=virtio,format=raw \
   -nic none \
+  -nographic \
   -serial mon:stdio
 ```
 
