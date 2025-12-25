@@ -84,11 +84,11 @@ mkdir -p ~/umu/UmuOSver011/disk
 ## disk.img の作り方（raw + ext4）
 ※まずは一番シンプルに「パーティションを切らず、ディスク全体を ext4 にする」方式で進める。
 
-例：2GBの永続ディスクを作る
+例：20GBの永続ディスクを作る
 
 ```bash
 cd ~/umu/UmuOSver011/disk
-truncate -s 2G disk.img
+truncate -s 20G disk.img
 mkfs.ext4 -F disk.img
 ```
 
