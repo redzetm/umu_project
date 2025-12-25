@@ -331,9 +331,11 @@ sudo chmod 600 /mnt/umuos011/etc/shadow
 
 5.4 BusyBox init 設定（ext4側）
 
-`/mnt/umuos011/etc/inittab`（最小例）:
+`/mnt/umuos011/etc/inittab`（最小）:
 
-```text
+```bash
+sudo mkdir -p /mnt/umuos011/etc
+sudo tee /mnt/umuos011/etc/inittab > /dev/null <<'EOF'
 ::sysinit:/etc/init.d/rcS
 
 ttyS0::respawn:/sbin/getty -L 115200 ttyS0 vt100
@@ -341,6 +343,11 @@ tty1::respawn:/sbin/getty 0 tty1 linux
 
 ::ctrlaltdel:/sbin/reboot
 ::shutdown:/bin/umount -a -r
+EOF
+
+sudo chown root:root /mnt/umuos011/etc/inittab
+sudo chmod 644 /mnt/umuos011/etc/inittab
+
 ```
 
 `/mnt/umuos011/etc/init.d/rcS`（起動スクリプト：最小）:
@@ -432,6 +439,11 @@ GW=192.168.0.1
 DNS=8.8.8.8
 TELNET_ENABLE=0
 ```
+sudo chown root:root /mnt/umuos011/etc/umu/network.conf
+sudo chmod 600 /mnt/umuos011/etc/umu/network.conf
+sudo chown root:root /mnt/umuos011/etc/umu
+sudo chmod 755 /mnt/umuos011/etc/umu
+
 
 5.6 マウント解除
 
