@@ -311,8 +311,8 @@ tama:x:1000:1000:tama:/home/tama:/bin/sh
 `/mnt/umuos011/etc/shadow`（600）:
 
 ```text
-root:<ROOT_HASH_HERE>:19000:0:99999:7:::
-tama:<TAMA_HASH_HERE>:19000:0:99999:7:::
+root:$6$6kFhX6HtVFlCZFA4$ZzEfrpLNc3WeuhdHryq.83CSpQDXcIk2vN3qkgFM2a7z0vwcNqlnBzZnm3lV7AAp3w87eEdhTauJGLg6Wm3IJ/:19000:0:99999:7:::
+tama:$6$L/U.mly9NN1l7Sbq$usVoDNweiQJj3343EfXLTTXk6D0sfeoEVKDF4Kn8FW057GneW257UCPvlcqGgedisVUcTPYXplibbOy.2Zj5r.:19000:0:99999:7:::
 ```
 
 `<ROOT_HASH_HERE>` / `<TAMA_HASH_HERE>` の作り方（例: SHA-512）:
