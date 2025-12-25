@@ -465,17 +465,17 @@ sudo umount /mnt/umuos011
 
 例:
 
-```cfg
+```grub.cfg
 set timeout=20
 set default=0
 
 menuentry "UmuOS 0.1.1 kernel 6.18.1" {
-  linux /boot/vmlinuz-6.18.1 ro root=UUID=<DISK_UUID_HERE> rootfstype=ext4 rootwait console=tty0 console=ttyS0,115200n8
+  linux /boot/vmlinuz-6.18.1 ro root=UUID=de27448b-bcd4-4e7d-b99e-95b364b48dd0 rootfstype=ext4 rootwait console=tty0 console=ttyS0,115200n8
   initrd /boot/initrd.img-6.18.1
 }
 
 menuentry "UmuOS 0.1.1 rescue (single)" {
-  linux /boot/vmlinuz-6.18.1 ro single root=UUID=<DISK_UUID_HERE> rootfstype=ext4 rootwait console=tty0 console=ttyS0,115200n8
+  linux /boot/vmlinuz-6.18.1 ro single root=UUID=de27448b-bcd4-4e7d-b99e-95b364b48dd0 rootfstype=ext4 rootwait console=tty0 console=ttyS0,115200n8
   initrd /boot/initrd.img-6.18.1
 }
 ```
