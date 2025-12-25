@@ -108,9 +108,17 @@ sudo dumpe2fs -h disk.img | grep -E '^Filesystem UUID:'
 例：disk.img を virtio-blk として追加
 
 ```bash
-qemu-system-x86_64 \
-  ...（ISO/UEFI等の既存オプション）... \
-  -drive file=~/umu/UmuOSver011/disk/disk.img,format=raw,if=virtio
+# 例: ローカルQEMUで「ISO(UEFI) + disk.img(virtio)」を接続して起動する
+# ※事前に ~/umu/UmuOSver011/UmuOSver011-boot.iso を作成してある前提（ISO作成後に実施）
+cd ~/umu/UmuOSver011
+
+qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+  -drive if=pflash,format=raw,file=/tmp/OVMF_VARS_umuos011.fd \
+  -cdrom UmuOSver011-boot.iso -boot d \
+  -drive file=disk/disk.img,if=virtio,format=raw \
+  -nic none \
+  -serial mon:stdio
 ```
 
 VM内では多くの場合 `/dev/vda` などとして見えます（ただし、デバイス名は環境で変わるのでUUIDマウント前提にする）。
