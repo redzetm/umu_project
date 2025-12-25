@@ -258,7 +258,7 @@ cp initrd.img-6.18.1 ~/umu/UmuOSver011/iso_root/boot/
 
 ```bash
 cd ~/umu/UmuOSver011/disk
-truncate -s 2G disk.img
+truncate -s 20G disk.img
 mkfs.ext4 -F disk.img
 ```
 
