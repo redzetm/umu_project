@@ -152,7 +152,7 @@ cd ~/umu/umu_project/UmuOSver011/initramfs/rootfs/bin
 ./busybox --install -s .
 ```
 
-### 6.2 自作 init（C）の仕様（ここが0.1.1の中核）
+### 6.2 自作 init（C言語）仕様（ここが0.1.1の中核）
 
 要件（最小）：
 1. `devtmpfs`/`proc`/`sysfs`/`devpts` をマウントする（`/dev` が無いとデバイス探索できない）
@@ -170,7 +170,7 @@ cd ~/umu/umu_project/UmuOSver011/initramfs/rootfs/bin
 ```bash
 cd ~/umu/umu_project/UmuOSver011/initramfs
 mkdir -p src
-# src/init.c を用意したら
+# src/init.c を用意したら（別途実装）
 gcc -static -Os -s -o rootfs/init src/init.c
 sudo chown root:root rootfs/init
 sudo chmod 755 rootfs/init
