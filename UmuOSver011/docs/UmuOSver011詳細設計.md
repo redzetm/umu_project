@@ -450,7 +450,7 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
 ## 13. 0.1.1 でのスコープ（やらないこと）
 - systemd導入
 - initramfs での複雑なユーザーランド（udev等）
-- BusyBox からの全面脱却（0.2以降）
+- BusyBox からの全面脱却（0.2以降）　
 ```
 
 
