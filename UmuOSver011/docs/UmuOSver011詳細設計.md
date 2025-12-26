@@ -46,7 +46,7 @@
 ---
 
 ## 2. 変数（ここだけ変えれば流用できる）
-- 作業ルート：`~/umu/UmuOSver011`
+- 作業ルート：`~/umu/umu_project/UmuOSver011`
 - Kernel：`6.18.1`
 - ISO：`UmuOSver011-boot.iso`
 - 永続ディスク：`disk/disk.img`
@@ -69,7 +69,7 @@ sudo apt install -y build-essential bc bison flex libssl-dev \
 
 ### 3.2 ディレクトリ作成
 ```bash
-mkdir -p ~/umu/UmuOSver011/{kernel,initramfs,iso_root/boot/grub,logs,disk,run}
+mkdir -p ~/umu/umu_project/UmuOSver011/{kernel,initramfs,iso_root/boot/grub,logs,disk,run}
 ```
 
 ---
@@ -79,14 +79,14 @@ mkdir -p ~/umu/UmuOSver011/{kernel,initramfs,iso_root/boot/grub,logs,disk,run}
 ### 4.1 作成
 まずは単純化のため「パーティション無し（ディスク全体が ext4）」で進める。
 ```bash
-cd ~/umu/UmuOSver011/disk
+cd ~/umu/umu_project/UmuOSver011/disk
 truncate -s 20G disk.img
 mkfs.ext4 -F disk.img
 ```
 
 ### 4.2 UUID取得（最重要）
 ```bash
-cd ~/umu/UmuOSver011/disk
+cd ~/umu/umu_project/UmuOSver011/disk
 sudo blkid -p -o value -s UUID disk.img
 ```
 
@@ -103,7 +103,7 @@ sudo dumpe2fs -h disk.img | grep -E '^Filesystem UUID:'
 
 ### 5.1 取得
 ```bash
-cd ~/umu/UmuOSver011/kernel
+cd ~/umu/umu_project/UmuOSver011/kernel
 wget -nc https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.1.tar.xz
 tar -xf linux-6.18.1.tar.xz
 cd linux-6.18.1
@@ -119,14 +119,15 @@ make -j"$(nproc)"
 
 ### 5.3 ISO側へ配置
 ```bash
-cp arch/x86/boot/bzImage ~/umu/UmuOSver011/iso_root/boot/vmlinuz-6.18.1
-cp .config ~/umu/UmuOSver011/iso_root/boot/config-6.18.1
+cp arch/x86/boot/bzImage ~/umu/umu_project/UmuOSver011/iso_root/boot/vmlinuz-6.18.1
+cp .config ~/umu/umu_project/UmuOSver011/iso_root/boot/config-6.18.1
 ```
 
 ### 5.4 検証
 ```bash
-file ~/umu/UmuOSver011/iso_root/boot/vmlinuz-6.18.1
+file ~/umu/umu_project/UmuOSver011/iso_root/boot/vmlinuz-6.18.1
 ```
+出力想定：vmlinuz-6.18.1: Linux kernel x86 boot executable bzImage, version 6.18.1 (...)
 
 ---
 
@@ -138,7 +139,7 @@ file ~/umu/UmuOSver011/iso_root/boot/vmlinuz-6.18.1
 
 ### 6.1 ルートFS骨格
 ```bash
-cd ~/umu/UmuOSver011/initramfs
+cd ~/umu/umu_project/UmuOSver011/initramfs
 mkdir -p rootfs/{bin,sbin,etc,proc,sys,dev,dev/pts,run,newroot}
 cp /bin/busybox rootfs/bin/
 sudo chown root:root rootfs/bin/busybox
@@ -147,7 +148,7 @@ sudo chmod 755 rootfs/bin/busybox
 
 BusyBox applet（initramfs側）：
 ```bash
-cd ~/umu/UmuOSver011/initramfs/rootfs/bin
+cd ~/umu/umu_project/UmuOSver011/initramfs/rootfs/bin
 ./busybox --install -s .
 ```
 
@@ -167,7 +168,7 @@ cd ~/umu/UmuOSver011/initramfs/rootfs/bin
 
 ビルド例：
 ```bash
-cd ~/umu/UmuOSver011/initramfs
+cd ~/umu/umu_project/UmuOSver011/initramfs
 mkdir -p src
 # src/init.c を用意したら
 gcc -static -Os -s -o rootfs/init src/init.c
@@ -177,14 +178,14 @@ sudo chmod 755 rootfs/init
 
 ### 6.3 initramfs 作成
 ```bash
-cd ~/umu/UmuOSver011/initramfs/rootfs
+cd ~/umu/umu_project/UmuOSver011/initramfs/rootfs
 find . -print0 | sudo cpio --null -o -H newc | gzip > ../initrd.img-6.18.1
-cp ../initrd.img-6.18.1 ~/umu/UmuOSver011/iso_root/boot/
+cp ../initrd.img-6.18.1 ~/umu/umu_project/UmuOSver011/iso_root/boot/
 ```
 
 検証：
 ```bash
-ls -lh ~/umu/UmuOSver011/iso_root/boot/initrd.img-6.18.1
+ls -lh ~/umu/umu_project/UmuOSver011/iso_root/boot/initrd.img-6.18.1
 ```
 
 ---
@@ -196,7 +197,7 @@ ls -lh ~/umu/UmuOSver011/iso_root/boot/initrd.img-6.18.1
 ### 7.1 マウント
 ```bash
 sudo mkdir -p /mnt/umuos011
-sudo mount -o loop ~/umu/UmuOSver011/disk/disk.img /mnt/umuos011
+sudo mount -o loop ~/umu/umu_project/UmuOSver011/disk/disk.img /mnt/umuos011
 ```
 
 ### 7.2 最小rootfs（必須）
@@ -324,7 +325,7 @@ sudo umount /mnt/umuos011
 
 ## 8. GRUB設定（ISO側）
 
-作成先：`~/umu/UmuOSver011/iso_root/boot/grub/grub.cfg`
+作成先：`~/umu/umu_project/UmuOSver011/iso_root/boot/grub/grub.cfg`
 
 ポイント：
 - `root=UUID=...` は **initramfs の自作 init が読む**ための情報
@@ -350,7 +351,7 @@ menuentry "UmuOS 0.1.1 rescue (single)" {
 
 ## 9. ISO作成
 ```bash
-cd ~/umu/UmuOSver011
+cd ~/umu/umu_project/UmuOSver011
 grub-mkrescue -o UmuOSver011-boot.iso iso_root
 ls -lh UmuOSver011-boot.iso
 ```
@@ -369,12 +370,12 @@ dpkg -L ovmf | grep -E 'OVMF_(CODE|VARS).*fd$'
 
 例（存在するパスに合わせて調整）：
 ```bash
-cp -n /usr/share/OVMF/OVMF_VARS_4M.fd ~/umu/UmuOSver011/run/OVMF_VARS_umuos011.fd
+cp -n /usr/share/OVMF/OVMF_VARS_4M.fd ~/umu/umu_project/UmuOSver011/run/OVMF_VARS_umuos011.fd
 ```
 
 ### 10.2 QEMU（ネット無し・観測性最大）
 ```bash
-cd ~/umu/UmuOSver011
+cd ~/umu/umu_project/UmuOSver011
 
 qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
@@ -393,7 +394,7 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
 
 ### 10.3 QEMU（ブリッジ：静的IP/telnet確認）
 ```bash
-cd ~/umu/UmuOSver011
+cd ~/umu/umu_project/UmuOSver011
 
 qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
