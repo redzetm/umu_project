@@ -65,5 +65,5 @@ BusyBoxのloginで認証する（/etc/passwd, /etc/shadowをext4側に配置）�
 
 
 
-202512270439
+202512270439　
 
