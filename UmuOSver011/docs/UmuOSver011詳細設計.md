@@ -1,7 +1,8 @@
 # UmuOS var0.1.1 詳細設計（改訂：再現性・観測性・失敗対策を仕様化）
 
-この詳細設計は「最初から順に実行すれば、同一ISOで QEMU と virt-manager の両方で起動でき、永続ディスクが `/` になる」
-ことを目的にした詳細設計。
+この詳細設計は [UmuOSver011基本計画.md](../UmuOSver011基本計画.md) の受入基準を満たすための「作業手順＋仕様」のたたき台。
+
+受入環境は **開発環境の QEMU** に限定する（virt-manager 等での起動可否は 0.1.1 の受入条件に含めない）。
 
 実装の背景・根拠は同ディレクトリの [実装ノート](実装ノート.md) を参照する。
 
@@ -14,6 +15,8 @@
 4. 静的IP（DHCPなし）：`192.168.0.204/24`、GW `192.168.0.1`、DNS `8.8.8.8`
 5. telnet（開発用途・必要時のみ）で接続し、loginできる
 6. `/logs/boot.log` が永続化され、再起動後も追記される
+
+成功＝「QEMU で再現でき、上記がすべて満たされる」
 
 ---
 
@@ -31,7 +34,7 @@
 4) 観測性が足りず「止まったように見える」
 - `console=ttyS0` が無い、QEMU側でシリアルを見ていない
 
-5) virt-manager / QEMU でデバイス名が変わる
+5) 起動方法やデバイスモデルでデバイス名が変わる
 - `/dev/vda` 固定は壊れやすい。設計は UUID に寄せる
 
 ### 1.2 対策（0.1.1での決定事項）
@@ -131,6 +134,7 @@ file ~/umu/UmuOSver011/iso_root/boot/vmlinuz-6.18.1
 
 0.1.1の initramfs は「永続 ext4 を `/` として使う」ための移行専用。
 ログイン・ネット初期化・telnetは switch_root 後（ext4側の `/sbin/init`）で行う。
+永続ログ（`/logs/boot.log`）は ext4 を `/` としてマウント後に書く（initramfs 単体での永続化は狙わない）。
 
 ### 6.1 ルートFS骨格
 ```bash
@@ -324,7 +328,7 @@ sudo umount /mnt/umuos011
 
 ポイント：
 - `root=UUID=...` は **initramfs の自作 init が読む**ための情報
-- `console=tty0 console=ttyS0,115200n8` を固定（virt-manager/QEMU両方で観測できる）
+- `console=tty0 console=ttyS0,115200n8` を固定（QEMUのシリアル出力で観測する）
 
 `<DISK_UUID>` を 4.2 の UUID に置換：
 ```cfg
@@ -402,9 +406,13 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
 
 `br0` は環境のブリッジ名に合わせて変更する。
 
+注意：静的IP（192.168.0.204/24）を成立させるため、user networking（NAT）ではなく L2 ブリッジ接続を前提とする。
+
 ---
 
 ## 11. 動作確認（受入基準の確認手順）
+
+この章は [UmuOSver011基本計画.md](../UmuOSver011基本計画.md) の「成功条件（受入基準）」と同じ観点で確認する。
 
 ### 11.1 永続化
 1. `/home/tama/test.txt` を作成
