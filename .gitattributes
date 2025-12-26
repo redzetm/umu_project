@@ -1,0 +1,2 @@
+*.c linguist-vendored
+*.roff linguist-language=Roff
