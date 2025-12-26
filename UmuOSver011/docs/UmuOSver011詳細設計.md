@@ -431,27 +431,5 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
 
 ---
 
-## 12. トラブルシュート（症状 → まず確認 → 対処）
-
-### 12.1 GRUBが出ない
-- まず確認：ISO作成が成功しているか、UEFI起動になっているか
-- 対処：`grub-mkrescue` の依存（`xorriso` 等）導入を確認
-
-### 12.2 kernel は起動するが root をマウントできない
-- まず確認：disk.img の UUID と `root=UUID=...` の一致
-- まず確認：initramfsで `/dev` が見えているか（devtmpfsをマウントしているか）
-- 対処：自作 init が UUID→デバイス解決できるよう、候補デバイスの範囲と ext4 UUID 読み取りを見直す
-
-### 12.3 switch_root 後に何も起きない
-- まず確認：ext4側に `/sbin/init` があるか（symlink含む）
-- まず確認：`/etc/inittab` と `/etc/init.d/rcS` があり、実行権限があるか
-
----
-
-## 13. 0.1.1 でのスコープ（やらないこと）
-- systemd導入
-- initramfs での複雑なユーザーランド（udev等）
-- BusyBox からの全面脱却（0.2以降）　
-```
 
 
