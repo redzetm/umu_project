@@ -68,7 +68,7 @@ sudo apt install -y build-essential bc bison flex libssl-dev \
   libelf-dev libncurses-dev dwarves git wget \
   grub-efi-amd64-bin grub-common xorriso mtools \
   qemu-system-x86 ovmf \
-  cpio gzip xz-utils busybox-static e2fsprogs
+  cpio gzip xz-utils busybox-static e2fsprogs musl-tools
 ```
 
 ### 3.2 ディレクトリ作成
@@ -129,6 +129,17 @@ ip addr show br0
 bridge link
 ```
 
+補足：QEMU ブリッジ接続が権限で失敗する場合
+- 症状例：`-nic bridge,br=br0` で `Operation not permitted` や bridge helper 関連エラー
+- 切り分け：まずは `sudo qemu-system-x86_64 ...` で起動できるか確認する
+- 恒久対応（推奨）：`qemu-bridge-helper` に `br0` を許可する
+
+```bash
+sudo install -d -m 755 /etc/qemu
+echo 'allow br0' | sudo tee /etc/qemu/bridge.conf
+sudo chmod 644 /etc/qemu/bridge.conf
+```
+
 4) Proxmox 側の注意（必要時のみ）
 - Proxmox の VM の NIC が `vmbr0` に接続されていること
 - Proxmox の firewall を有効化している場合、ブリッジ配下で複数MACが流れる構成（ネストブリッジ）が止められることがある。
@@ -140,6 +151,8 @@ bridge link
 
 ### 4.1 作成
 まずは単純化のため「パーティション無し（ディスク全体が ext4）」で進める。
+
+補足：パーティション無し＝`mount -o loop disk.img ...` でOK（`fdisk` は不要）。
 ```bash
 cd ~/umu/umu_project/UmuOSver011/disk
 truncate -s 20G disk.img
@@ -179,6 +192,24 @@ make defconfig
 make -j"$(nproc)"
 ```
 
+#### Kernel config 必須チェック（initramfs使用時）
+
+initramfs から ext4 を mount するため、最低限以下が built-in（`=y`）になっていることを確認する。
+
+- `CONFIG_EXT4_FS=y`
+- `CONFIG_VIRTIO=y`
+- `CONFIG_VIRTIO_PCI=y`
+- `CONFIG_VIRTIO_BLK=y`
+- `CONFIG_DEVTMPFS=y`
+- `CONFIG_DEVTMPFS_MOUNT=y`
+
+確認（例）：
+```bash
+grep -E '^(CONFIG_EXT4_FS|CONFIG_VIRTIO|CONFIG_VIRTIO_PCI|CONFIG_VIRTIO_BLK|CONFIG_DEVTMPFS|CONFIG_DEVTMPFS_MOUNT)=' .config
+```
+
+もし `=m` や未設定なら、必要最小限で `make menuconfig` で `=y` に変更して再ビルドする。
+
 ### 5.3 ISO側へ配置
 ```bash
 cp arch/x86/boot/bzImage ~/umu/umu_project/UmuOSver011/iso_root/boot/vmlinuz-6.18.1
@@ -208,6 +239,13 @@ sudo chown root:root rootfs/bin/busybox
 sudo chmod 755 rootfs/bin/busybox
 ```
 
+BusyBox は `busybox-static` 前提（initramfs 内で動的リンクだと動かないため）。
+
+開発マシン側で確認：
+```bash
+file /bin/busybox
+```
+
 BusyBox applet（initramfs側）：
 ```bash
 cd ~/umu/umu_project/UmuOSver011/initramfs/rootfs/bin
@@ -226,6 +264,13 @@ cd ~/umu/umu_project/UmuOSver011/initramfs/rootfs/bin
 5. `/newroot/logs/boot.log` に簡易ログを書ける範囲で追記する
 6. `switch_root /newroot /sbin/init`
 
+実装仕様（つまずき防止として必須）：
+- 候補デバイスは最低限 `vd*` / `sd*` / `nvme*n*` を走査し、走査したデバイス名をシリアルへ出す
+- `/proc/cmdline` の `root=UUID=...` は 36文字（ハイフンあり）を想定し、16バイトへ正しく変換して比較する
+- 一致した場合は「見つけたデバイス名」と「そのデバイスから読めたUUID」をシリアルへ出す
+- 失敗時も、最後に「見つからなかったUUID」と「走査した候補」をシリアルへ出して停止する
+- `switch_root` は PATH に依存せず、`/bin/switch_root` をフルパスで `exec` する
+
 注意：この仕様により、initramfs段階では `mount UUID=...` に依存しない（前回の失敗を潰す）。
 
 ビルド例：
@@ -233,7 +278,7 @@ cd ~/umu/umu_project/UmuOSver011/initramfs/rootfs/bin
 cd ~/umu/umu_project/UmuOSver011/initramfs
 mkdir -p src
 # src/init.c を用意したら（別途実装）
-gcc -static -Os -s -o rootfs/init src/init.c
+musl-gcc -static -Os -s -o rootfs/init src/init.c
 sudo chown root:root rootfs/init
 sudo chmod 755 rootfs/init
 ```
@@ -304,12 +349,13 @@ sudo chmod 600 /mnt/umuos011/etc/shadow
 ```sh
 ::sysinit:/etc/init.d/rcS
 
-ttyS0::respawn:/sbin/getty -L 115200 ttyS0 vt100
-tty1::respawn:/sbin/getty 0 tty1 linux
+ttyS0::respawn:/bin/getty -L 115200 ttyS0 vt100
 
-::ctrlaltdel:/sbin/reboot
+::ctrlaltdel:/bin/reboot
 ::shutdown:/bin/umount -a -r
 ```
+
+方針：ver0.1.1 は `-nographic` 前提とし、ログインおよび受入テストの入口はシリアルコンソール（`ttyS0`）に固定する。
 
 `/etc/init.d/rcS`（最小：ログ + FS + ネット + 任意telnet）：　/etcは755なのでsudo vim 。。。しないと書き込めないので注意
 ```sh
@@ -454,6 +500,8 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
 - kernel log が `ttyS0` に流れる
 - initramfs の自作 init が UUID を解決して mount → switch_root できる
 
+ログイン/操作の入口：シリアルコンソール（`ttyS0`）。`-nographic` のため VGA 出力は前提にしない。
+
 ### 10.3 QEMU（ブリッジ：静的IP/telnet確認）
 ```bash
 cd ~/umu/umu_project/UmuOSver011
@@ -490,6 +538,12 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
 
 ### 11.4 telnet
 - `TELNET_ENABLE=1` の時のみ `telnet 192.168.0.204` で接続でき、loginできる
+
+telnet 接続の切り分け順序（固定）：
+1) L3疎通（ICMP）：開発マシン側または同一LANの別ホストから `ping 192.168.0.204`
+2) L2疎通（ARP）：`arp -n` などで `192.168.0.204` の MAC 解決を確認
+3) UmuOS側の状態：UmuOS側で `ip addr` / `ip route` を確認
+4) telnet（最後）：上記が成立してから `TELNET_ENABLE=1` の時のみ試す
 
 ---
 
