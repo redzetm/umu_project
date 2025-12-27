@@ -204,7 +204,12 @@ static int parse_root_uuid_from_cmdline(uint8_t out_uuid[UUID_BIN_LEN])
 	return 0;
 }
 
-/* ext4 superblock: 1024 bytes offset, UUID field offset 0x68, size 16 */
+/*
+ * ext4 superblock
+ * - superblock offset: 1024 bytes
+ * - s_magic offset: 0x38 (2 bytes) must be 0xEF53
+ * - s_uuid  offset: 0x68 (16 bytes)
+ */
 static int read_ext4_uuid_from_device(const char *dev_path, uint8_t out_uuid[UUID_BIN_LEN])
 {
 	int fd = open(dev_path, O_RDONLY | O_CLOEXEC);
@@ -212,14 +217,22 @@ static int read_ext4_uuid_from_device(const char *dev_path, uint8_t out_uuid[UUI
 		return -1;
 	}
 
-	off_t off = (off_t)1024 + (off_t)0x68;
-	ssize_t n = pread(fd, out_uuid, UUID_BIN_LEN, off);
+	uint8_t sb[1024];
+	ssize_t n = pread(fd, sb, sizeof(sb), (off_t)1024);
 	int saved_errno = errno;
 	close(fd);
-	if (n != UUID_BIN_LEN) {
+	if (n != (ssize_t)sizeof(sb)) {
 		errno = saved_errno;
 		return -1;
 	}
+
+	/* s_magic is little-endian 0xEF53 */
+	uint16_t magic = (uint16_t)sb[0x38] | ((uint16_t)sb[0x39] << 8);
+	if (magic != 0xEF53) {
+		return -1;
+	}
+
+	memcpy(out_uuid, &sb[0x68], UUID_BIN_LEN);
 	return 0;
 }
 
@@ -236,10 +249,11 @@ static bool is_candidate_dev_name(const char *name)
 	 * - sd[a-z], sd[a-z][0-9]*
 	 * - nvme0n1, nvme0n1p1 など
 	 */
-	if (starts_with(name, "vd") && isalpha((unsigned char)name[2])) {
+	size_t len = strlen(name);
+	if (len >= 3 && starts_with(name, "vd") && isalpha((unsigned char)name[2])) {
 		return true;
 	}
-	if (starts_with(name, "sd") && isalpha((unsigned char)name[2])) {
+	if (len >= 3 && starts_with(name, "sd") && isalpha((unsigned char)name[2])) {
 		return true;
 	}
 	if (starts_with(name, "nvme")) {
@@ -256,6 +270,114 @@ static bool is_block_device(const char *path)
 		return false;
 	}
 	return S_ISBLK(st.st_mode);
+}
+
+static int list_candidate_devices(char *out, size_t out_size, int *out_count, bool *out_truncated)
+{
+	if (out_size == 0) {
+		return -1;
+	}
+	out[0] = '\0';
+	if (out_count) {
+		*out_count = 0;
+	}
+	if (out_truncated) {
+		*out_truncated = false;
+	}
+
+	DIR *d = opendir("/dev");
+	if (d == NULL) {
+		log_printf("[init] opendir /dev failed: errno=%d (%s)", errno, strerror(errno));
+		return -1;
+	}
+
+	struct dirent *ent;
+	size_t used = 0;
+	int count = 0;
+	while ((ent = readdir(d)) != NULL) {
+		const char *name = ent->d_name;
+		if (name[0] == '.') {
+			continue;
+		}
+		if (!is_candidate_dev_name(name)) {
+			continue;
+		}
+
+		char dev_path[512];
+		int n = snprintf(dev_path, sizeof(dev_path), "/dev/%s", name);
+		if (n < 0 || (size_t)n >= sizeof(dev_path)) {
+			continue;
+		}
+		if (!is_block_device(dev_path)) {
+			continue;
+		}
+
+		count++;
+
+		const char *sep = (used == 0) ? "" : " ";
+		size_t need = strlen(sep) + strlen(dev_path);
+		if (used + need + 1 >= out_size) {
+			if (out_truncated) {
+				*out_truncated = true;
+			}
+			break;
+		}
+		memcpy(out + used, sep, strlen(sep));
+		used += strlen(sep);
+		memcpy(out + used, dev_path, strlen(dev_path));
+		used += strlen(dev_path);
+		out[used] = '\0';
+	}
+
+	closedir(d);
+	if (out_count) {
+		*out_count = count;
+	}
+	return 0;
+}
+
+static void dump_ext4_candidate_uuids(const uint8_t want_uuid[UUID_BIN_LEN])
+{
+	DIR *d = opendir("/dev");
+	if (d == NULL) {
+		log_printf("[init] opendir /dev failed: errno=%d (%s)", errno, strerror(errno));
+		return;
+	}
+
+	struct dirent *ent;
+	int printed = 0;
+	while ((ent = readdir(d)) != NULL) {
+		const char *name = ent->d_name;
+		if (name[0] == '.') {
+			continue;
+		}
+		if (!is_candidate_dev_name(name)) {
+			continue;
+		}
+
+		char dev_path[512];
+		int n = snprintf(dev_path, sizeof(dev_path), "/dev/%s", name);
+		if (n < 0 || (size_t)n >= sizeof(dev_path)) {
+			continue;
+		}
+		if (!is_block_device(dev_path)) {
+			continue;
+		}
+
+		uint8_t got_uuid[UUID_BIN_LEN];
+		if (read_ext4_uuid_from_device(dev_path, got_uuid) != 0) {
+			continue;
+		}
+
+		char got_str[UUID_STR_MAX];
+		uuid_to_string(got_uuid, got_str);
+		log_printf("[init] ext4: dev=%s uuid=%s match=%d", dev_path, got_str,
+			  memcmp(got_uuid, want_uuid, UUID_BIN_LEN) == 0 ? 1 : 0);
+		printed++;
+	}
+
+	closedir(d);
+	log_printf("[init] ext4 candidates printed: %d", printed);
 }
 
 static int find_device_by_uuid(const uint8_t want_uuid[UUID_BIN_LEN], char *out_path, size_t out_path_size)
@@ -387,7 +509,8 @@ int main(void)
 			emergency_loop();
 		}
 
-		if (mount(dev_path, "/newroot", "ext4", 0, "") == 0) {
+		/* 設計通り rw を明示する（MS_RDONLY は付けない） */
+		if (mount(dev_path, "/newroot", "ext4", 0, "rw") == 0) {
 			log_printf("[init] mount root ok (rw): %s", dev_path);
 			mounted = true;
 			break;
@@ -400,6 +523,19 @@ int main(void)
 
 	if (!mounted) {
 		log_printf("[init] root mount not completed (timeout): dev=%s", dev_path[0] ? dev_path : "(none)");
+		char uuid_str[UUID_STR_MAX];
+		uuid_to_string(want_uuid, uuid_str);
+		log_printf("[init] want root UUID: %s", uuid_str);
+
+		char candidates[2048];
+		int ccount = 0;
+		bool truncated = false;
+		if (list_candidate_devices(candidates, sizeof(candidates), &ccount, &truncated) == 0) {
+			log_printf("[init] candidates in /dev: count=%d truncated=%d", ccount, truncated ? 1 : 0);
+			log_printf("[init] candidates: %s", candidates[0] ? candidates : "(none)");
+		}
+
+		dump_ext4_candidate_uuids(want_uuid);
 		emergency_loop();
 	}
 
