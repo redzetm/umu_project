@@ -46,6 +46,8 @@
 - initramfs の自作 init は「UUID → 実デバイス名」を **自前で解決**して mount する
   - つまり `mount UUID=...` には依存しない（udev不要・再現性重視）
 - 観測性のため `console=tty0 console=ttyS0,115200n8` を固定し、QEMUはシリアル出力で起動ログを見る
+- 観測性のため `console=tty0 console=ttyS0,115200n8` を固定し、QEMUはシリアル出力で起動ログを見る
+- 本開発環境の QEMU は **ソフトウェアエミュレーション（`accel=tcg`）を前提**とし、KVM（ネストKVMや `/dev/kvm` の有無）は考慮対象外とする
 
 ---
 
@@ -202,10 +204,12 @@ initramfs から ext4 を mount するため、最低限以下が built-in（`=y
 - `CONFIG_VIRTIO_BLK=y`
 - `CONFIG_DEVTMPFS=y`
 - `CONFIG_DEVTMPFS_MOUNT=y`
+- `CONFIG_BLK_DEV_INITRD=y`
+- `CONFIG_RD_GZIP=y`（initramfs を gzip 圧縮している場合）
 
 確認（例）：
 ```bash
-grep -E '^(CONFIG_EXT4_FS|CONFIG_VIRTIO|CONFIG_VIRTIO_PCI|CONFIG_VIRTIO_BLK|CONFIG_DEVTMPFS|CONFIG_DEVTMPFS_MOUNT)=' .config
+grep -E '^(CONFIG_EXT4_FS|CONFIG_VIRTIO|CONFIG_VIRTIO_PCI|CONFIG_VIRTIO_BLK|CONFIG_DEVTMPFS|CONFIG_DEVTMPFS_MOUNT|CONFIG_BLK_DEV_INITRD|CONFIG_RD_GZIP)=' .config
 ```
 
 もし `=m` や未設定なら、必要最小限で `make menuconfig` で `=y` に変更して再ビルドする。
@@ -515,7 +519,7 @@ cp -n /usr/share/OVMF/OVMF_VARS_4M.fd ~/umu/umu_project/UmuOSver011/run/OVMF_VAR
 ```bash
 cd ~/umu/umu_project/UmuOSver011
 
-qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
+qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=tcg -cpu max \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
   -drive if=pflash,format=raw,file=run/OVMF_VARS_umuos011.fd \
   -cdrom UmuOSver011-boot.iso -boot d \
@@ -537,7 +541,7 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
 ```bash
 cd ~/umu/umu_project/UmuOSver011
 
-qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
+qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=tcg -cpu max \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
   -drive if=pflash,format=raw,file=run/OVMF_VARS_umuos011.fd \
   -cdrom UmuOSver011-boot.iso -boot d \
