@@ -331,10 +331,22 @@ tama:x:1000:1000:tama:/home/tama:/bin/sh
 ```
 
 `/etc/shadow` は環境ごとに作成する（ハッシュを設計書に直書きしない）。
-/etcは755なのでsudo vim 。。。しないと書き込めないので注意
-開発マシン側で生成例（SHA-512）：
+
+開発マシン側でパスワードハッシュを生成（SHA-512）：
 ```bash
 openssl passwd -6
+```
+
+1) `root` 用ハッシュを1回生成して控える
+
+2) `tama` 用ハッシュを1回生成して控える
+
+3) `/mnt/umuos011/etc/shadow` を作成（`<ROOT_HASH>` / `<TAMA_HASH>` を置換）
+```bash
+sudo tee /mnt/umuos011/etc/shadow >/dev/null <<'EOF'
+root:<ROOT_HASH>:0:0:99999:7:::
+tama:<TAMA_HASH>:0:0:99999:7:::
+EOF
 ```
 
 権限：
@@ -342,6 +354,11 @@ openssl passwd -6
 sudo chown root:root /mnt/umuos011/etc/passwd /mnt/umuos011/etc/shadow
 sudo chmod 644 /mnt/umuos011/etc/passwd
 sudo chmod 600 /mnt/umuos011/etc/shadow
+```
+
+`/home/tama` の所有者（推奨）：
+```bash
+sudo chown -R 1000:1000 /mnt/umuos011/home/tama
 ```
 
 ### 7.4 BusyBox init（inittab/rcS）
@@ -356,6 +373,19 @@ ttyS0::respawn:/bin/getty -L 115200 ttyS0 vt100
 ```
 
 方針：ver0.1.1 は `-nographic` 前提とし、ログインおよび受入テストの入口はシリアルコンソール（`ttyS0`）に固定する。
+
+補足：BusyBox `login` の挙動差（rootログインが弾かれる場合）
+
+環境/設定により、`/etc/securetty` が無いと root のログインが拒否されることがある。
+その場合は以下を追加する（`ttyS0` のみ許可）：
+
+```bash
+sudo tee /mnt/umuos011/etc/securetty >/dev/null <<'EOF'
+ttyS0
+EOF
+sudo chown root:root /mnt/umuos011/etc/securetty
+sudo chmod 644 /mnt/umuos011/etc/securetty
+```
 
 `/etc/init.d/rcS`（最小：ログ + FS + ネット + 任意telnet）：　/etcは755なのでsudo vim 。。。しないと書き込めないので注意
 ```sh
@@ -492,7 +522,8 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
   -drive file=disk/disk.img,if=virtio,format=raw \
   -nic none \
   -nographic \
-  -serial mon:stdio
+  -serial stdio \
+  -monitor none
 ```
 
 観測ポイント：
@@ -512,7 +543,9 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
   -cdrom UmuOSver011-boot.iso -boot d \
   -drive file=disk/disk.img,if=virtio,format=raw \
   -nic bridge,br=br0,model=virtio-net-pci \
-  -serial mon:stdio
+  -nographic \
+  -serial stdio \
+  -monitor none
 ```
 
 `br0` は環境のブリッジ名に合わせて変更する。
