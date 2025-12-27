@@ -1,0 +1,425 @@
+#define _GNU_SOURCE
+
+#include <ctype.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mount.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+/*
+ * UmuOS ver0.1.1 initramfs init
+ *
+ * 目的:
+ * - /proc/cmdline の root=UUID=... を読み取る
+ * - /dev 配下の候補デバイスを走査し、ext4 superblock の UUID が一致するデバイスを探す
+ * - /newroot に mount して /bin/switch_root で /sbin/init へ移行する
+ *
+ * 重要:
+ * - 観測性: 失敗理由と走査内容を必ず出力する
+ * - 依存を減らす: udev や /dev/disk/by-uuid に依存しない
+ */
+
+enum {
+	CMDLINE_MAX = 4096,
+	UUID_BIN_LEN = 16,
+	UUID_STR_MAX = 64,
+};
+
+static void log_printf(const char *fmt, ...)
+{
+	char buf[1024];
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
+	fprintf(stderr, "%s\n", buf);
+	fflush(stderr);
+}
+
+static int ensure_dir(const char *path, mode_t mode)
+{
+	if (mkdir(path, mode) == 0) {
+		return 0;
+	}
+	if (errno == EEXIST) {
+		return 0;
+	}
+	log_printf("[init] mkdir failed: path=%s errno=%d (%s)", path, errno, strerror(errno));
+	return -1;
+}
+
+static int mount_if_needed(const char *source, const char *target, const char *fstype, unsigned long flags, const char *data)
+{
+	if (ensure_dir(target, 0755) != 0) {
+		return -1;
+	}
+
+	if (mount(source, target, fstype, flags, data) == 0) {
+		log_printf("[init] mount ok: %s on %s type=%s", source ? source : "(none)", target, fstype);
+		return 0;
+	}
+
+	if (errno == EBUSY) {
+		/* すでにマウント済み */
+		log_printf("[init] mount skip (busy): %s on %s type=%s", source ? source : "(none)", target, fstype);
+		return 0;
+	}
+
+	log_printf("[init] mount failed: %s on %s type=%s errno=%d (%s)",
+		   source ? source : "(none)", target, fstype, errno, strerror(errno));
+	return -1;
+}
+
+static int read_file_to_buf(const char *path, char *buf, size_t buf_size)
+{
+	int fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (fd < 0) {
+		log_printf("[init] open failed: %s errno=%d (%s)", path, errno, strerror(errno));
+		return -1;
+	}
+
+	ssize_t n = read(fd, buf, buf_size - 1);
+	int saved_errno = errno;
+	close(fd);
+	if (n < 0) {
+		errno = saved_errno;
+		log_printf("[init] read failed: %s errno=%d (%s)", path, errno, strerror(errno));
+		return -1;
+	}
+
+	buf[n] = '\0';
+	return 0;
+}
+
+static int hex_value(int c)
+{
+	if ('0' <= c && c <= '9') {
+		return c - '0';
+	}
+	if ('a' <= c && c <= 'f') {
+		return 10 + (c - 'a');
+	}
+	if ('A' <= c && c <= 'F') {
+		return 10 + (c - 'A');
+	}
+	return -1;
+}
+
+/*
+ * UUID文字列を 16byte に変換する。
+ * - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"（36文字）を想定
+ * - ハイフンは無視
+ */
+static int parse_uuid_string(const char *s, uint8_t out[UUID_BIN_LEN])
+{
+	int out_pos = 0;
+	int high = -1;
+
+	for (size_t i = 0; s[i] != '\0'; i++) {
+		unsigned char ch = (unsigned char)s[i];
+		if (ch == ' ' || ch == '\n' || ch == '\t') {
+			break;
+		}
+		if (ch == '-') {
+			continue;
+		}
+
+		int v = hex_value(ch);
+		if (v < 0) {
+			return -1;
+		}
+
+		if (high < 0) {
+			high = v;
+			continue;
+		}
+
+		if (out_pos >= UUID_BIN_LEN) {
+			return -1;
+		}
+
+		out[out_pos] = (uint8_t)((high << 4) | v);
+		out_pos++;
+		high = -1;
+	}
+
+	if (high != -1) {
+		return -1;
+	}
+	if (out_pos != UUID_BIN_LEN) {
+		return -1;
+	}
+	return 0;
+}
+
+static void uuid_to_string(const uint8_t uuid[UUID_BIN_LEN], char out[UUID_STR_MAX])
+{
+	/*
+	 * 8-4-4-4-12 形式
+	 * 16 bytes => 32 hex digits
+	 */
+	snprintf(out, UUID_STR_MAX,
+		 "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+		 uuid[0], uuid[1], uuid[2], uuid[3],
+		 uuid[4], uuid[5],
+		 uuid[6], uuid[7],
+		 uuid[8], uuid[9],
+		 uuid[10], uuid[11], uuid[12], uuid[13], uuid[14], uuid[15]);
+}
+
+static int parse_root_uuid_from_cmdline(uint8_t out_uuid[UUID_BIN_LEN])
+{
+	char cmdline[CMDLINE_MAX];
+	if (read_file_to_buf("/proc/cmdline", cmdline, sizeof(cmdline)) != 0) {
+		return -1;
+	}
+
+	log_printf("[init] /proc/cmdline: %s", cmdline);
+
+	const char *key = "root=UUID=";
+	char *p = strstr(cmdline, key);
+	if (p == NULL) {
+		log_printf("[init] root=UUID= not found in cmdline");
+		return -1;
+	}
+	p += strlen(key);
+
+	if (parse_uuid_string(p, out_uuid) != 0) {
+		log_printf("[init] invalid UUID string in cmdline: %s", p);
+		return -1;
+	}
+
+	char uuid_str[UUID_STR_MAX];
+	uuid_to_string(out_uuid, uuid_str);
+	log_printf("[init] want root UUID: %s", uuid_str);
+	return 0;
+}
+
+/* ext4 superblock: 1024 bytes offset, UUID field offset 0x68, size 16 */
+static int read_ext4_uuid_from_device(const char *dev_path, uint8_t out_uuid[UUID_BIN_LEN])
+{
+	int fd = open(dev_path, O_RDONLY | O_CLOEXEC);
+	if (fd < 0) {
+		return -1;
+	}
+
+	off_t off = (off_t)1024 + (off_t)0x68;
+	ssize_t n = pread(fd, out_uuid, UUID_BIN_LEN, off);
+	int saved_errno = errno;
+	close(fd);
+	if (n != UUID_BIN_LEN) {
+		errno = saved_errno;
+		return -1;
+	}
+	return 0;
+}
+
+static bool starts_with(const char *s, const char *prefix)
+{
+	return strncmp(s, prefix, strlen(prefix)) == 0;
+}
+
+static bool is_candidate_dev_name(const char *name)
+{
+	/*
+	 * 最低限の候補
+	 * - vd[a-z], vd[a-z][0-9]*
+	 * - sd[a-z], sd[a-z][0-9]*
+	 * - nvme0n1, nvme0n1p1 など
+	 */
+	if (starts_with(name, "vd") && isalpha((unsigned char)name[2])) {
+		return true;
+	}
+	if (starts_with(name, "sd") && isalpha((unsigned char)name[2])) {
+		return true;
+	}
+	if (starts_with(name, "nvme")) {
+		/* nvme0n1 / nvme0n1p1 などを広めに許可 */
+		return true;
+	}
+	return false;
+}
+
+static bool is_block_device(const char *path)
+{
+	struct stat st;
+	if (stat(path, &st) != 0) {
+		return false;
+	}
+	return S_ISBLK(st.st_mode);
+}
+
+static int find_device_by_uuid(const uint8_t want_uuid[UUID_BIN_LEN], char *out_path, size_t out_path_size)
+{
+	DIR *d = opendir("/dev");
+	if (d == NULL) {
+		log_printf("[init] opendir /dev failed: errno=%d (%s)", errno, strerror(errno));
+		return -1;
+	}
+
+	struct dirent *ent;
+	int scanned = 0;
+	while ((ent = readdir(d)) != NULL) {
+		const char *name = ent->d_name;
+		if (name[0] == '.') {
+			continue;
+		}
+		if (!is_candidate_dev_name(name)) {
+			continue;
+		}
+
+		/*
+		 * Linux のデバイス名は通常短いが、過度に短いバッファだと
+		 * 走査対象によっては snprintf の切り詰め警告が出る。
+		 */
+		char dev_path[512];
+		int n = snprintf(dev_path, sizeof(dev_path), "/dev/%s", name);
+		if (n < 0 || (size_t)n >= sizeof(dev_path)) {
+			continue;
+		}
+
+		if (!is_block_device(dev_path)) {
+			continue;
+		}
+
+		scanned++;
+		log_printf("[init] scan: %s", dev_path);
+
+		uint8_t got_uuid[UUID_BIN_LEN];
+		if (read_ext4_uuid_from_device(dev_path, got_uuid) != 0) {
+			/* ext4 ではない等。ログは量が増えるので必要最小限 */
+			continue;
+		}
+
+		if (memcmp(got_uuid, want_uuid, UUID_BIN_LEN) == 0) {
+			strncpy(out_path, dev_path, out_path_size);
+			out_path[out_path_size - 1] = '\0';
+
+			char uuid_str[UUID_STR_MAX];
+			uuid_to_string(got_uuid, uuid_str);
+			log_printf("[init] matched: dev=%s uuid=%s", dev_path, uuid_str);
+
+			closedir(d);
+			return 0;
+		}
+	}
+
+	closedir(d);
+	log_printf("[init] device scan done: scanned=%d (no match)", scanned);
+	return -1;
+}
+
+static int append_boot_log_under_newroot(const char *msg)
+{
+	/* /newroot/logs/boot.log へ追記（存在しない場合は作る） */
+	(void)ensure_dir("/newroot/logs", 0755);
+
+	int fd = open("/newroot/logs/boot.log", O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
+	if (fd < 0) {
+		log_printf("[init] open boot.log failed: errno=%d (%s)", errno, strerror(errno));
+		return -1;
+	}
+
+	(void)write(fd, msg, strlen(msg));
+	(void)write(fd, "\n", 1);
+	close(fd);
+	return 0;
+}
+
+static void emergency_loop(void)
+{
+	log_printf("[init] entering emergency loop (sleep)");
+	for (;;) {
+		sleep(1);
+	}
+}
+
+int main(void)
+{
+	log_printf("[init] UmuOS initramfs init start");
+
+	/* 1) 最低限のFSをマウント */
+	if (mount_if_needed("proc", "/proc", "proc", 0, "") != 0) {
+		emergency_loop();
+	}
+	if (mount_if_needed("sysfs", "/sys", "sysfs", 0, "") != 0) {
+		emergency_loop();
+	}
+	if (mount_if_needed("devtmpfs", "/dev", "devtmpfs", 0, "") != 0) {
+		emergency_loop();
+	}
+	if (mount_if_needed("devpts", "/dev/pts", "devpts", 0, "") != 0) {
+		emergency_loop();
+	}
+
+	/* 2) root UUID を取得 */
+	uint8_t want_uuid[UUID_BIN_LEN];
+	if (parse_root_uuid_from_cmdline(want_uuid) != 0) {
+		emergency_loop();
+	}
+
+	/* 3) UUID一致のデバイスを探して mount */
+	const int max_tries = 120;          /* 120 * 0.25s = 30s */
+	const useconds_t wait_us = 250000;  /* 250ms */
+
+	char dev_path[512];
+	memset(dev_path, 0, sizeof(dev_path));
+	bool mounted = false;
+
+	for (int i = 1; i <= max_tries; i++) {
+		if (find_device_by_uuid(want_uuid, dev_path, sizeof(dev_path)) != 0) {
+			log_printf("[init] retry %d/%d (device not found yet)", i, max_tries);
+			usleep(wait_us);
+			continue;
+		}
+
+		log_printf("[init] mounting root: dev=%s -> /newroot", dev_path);
+		if (ensure_dir("/newroot", 0755) != 0) {
+			emergency_loop();
+		}
+
+		if (mount(dev_path, "/newroot", "ext4", 0, "") == 0) {
+			log_printf("[init] mount root ok (rw): %s", dev_path);
+			mounted = true;
+			break;
+		}
+		log_printf("[init] mount root failed: dev=%s errno=%d (%s)", dev_path, errno, strerror(errno));
+
+		log_printf("[init] retry %d/%d", i, max_tries);
+		usleep(wait_us);
+	}
+
+	if (!mounted) {
+		log_printf("[init] root mount not completed (timeout): dev=%s", dev_path[0] ? dev_path : "(none)");
+		emergency_loop();
+	}
+
+	append_boot_log_under_newroot("[initramfs] mounted root and will switch_root");
+
+	/* 4) switch_root */
+	log_printf("[init] exec: /bin/switch_root /newroot /sbin/init");
+
+	char *const argv[] = {
+		"switch_root",
+		"/newroot",
+		"/sbin/init",
+		NULL,
+	};
+
+	execv("/bin/switch_root", argv);
+	log_printf("[init] execv switch_root failed: errno=%d (%s)", errno, strerror(errno));
+	log_printf("[init] note: ensure /bin/switch_root exists in initramfs (BusyBox applet)");
+	log_printf("[init] note: ensure ext4 root has /sbin/init (symlink to /bin/busybox) and /etc/inittab");
+
+	emergency_loop();
+	return 1;
+}
