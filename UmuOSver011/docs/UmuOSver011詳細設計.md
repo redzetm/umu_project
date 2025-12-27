@@ -72,6 +72,58 @@ sudo apt install -y build-essential bc bison flex libssl-dev \
 mkdir -p ~/umu/umu_project/UmuOSver011/{kernel,initramfs,iso_root/boot/grub,logs,disk,run}
 ```
 
+### 3.3 ブリッジ（br0）準備（静的IP/telnet検証用）
+
+目的：QEMU の `-nic bridge,br=br0` を使い、ゲストを LAN と同一 L2 に接続する。
+
+前提：開発環境は Ubuntu 24.04 LTS（ProxmoxVE 9.1 上の VM）。Proxmox 側はブリッジ `vmbr0` を使用している。
+
+注意：この作業はホスト（Ubuntu）側のネットワーク構成を変更するため、SSH 作業中だと切断リスクがある。Proxmox のコンソール等、復旧できる経路を確保してから実施する。
+
+1) Ubuntu 側の物理NIC名を確認（例：`ens18`）
+```bash
+ip -br link
+ip route
+```
+
+2) netplan で `br0` を作成（例：DHCPでホスト疎通を維持する場合）
+
+`<IFNAME>` を 1) で確認した NIC 名に置換する。
+
+```bash
+sudo tee /etc/netplan/01-br0.yaml >/dev/null <<'EOF'
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    <IFNAME>:
+      dhcp4: no
+  bridges:
+    br0:
+      interfaces: [<IFNAME>]
+      dhcp4: yes
+      parameters:
+        stp: false
+        forward-delay: 0
+EOF
+
+sudo netplan apply
+```
+
+ホスト側を静的IPにしている場合は、`br0` に `addresses` / `routes` / `nameservers` を設定し、`dhcp4: yes` は使わない。
+
+3) `br0` ができたことを確認
+```bash
+ip -br link show br0
+ip addr show br0
+bridge link
+```
+
+4) Proxmox 側の注意（必要時のみ）
+- Proxmox の VM の NIC が `vmbr0` に接続されていること
+- Proxmox の firewall を有効化している場合、ブリッジ配下で複数MACが流れる構成（ネストブリッジ）が止められることがある。
+  その場合は firewall 設定を見直す（まずは検証のために無効化して切り分ける）。
+
 ---
 
 ## 4. 永続ディスク（ext4の/）: disk.img
@@ -431,5 +483,5 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=kvm -cpu host \
 
 ---
 
-
+202512270902
 
