@@ -8,6 +8,10 @@
 
 ---
 
+## 用語
+- 開発マシン側：QEMU を実行し、ISO作成・disk.img編集・br0設定などを行う Ubuntu 24.04 LTS 環境
+- UmuOS側：QEMU 上で起動するゲストOS（Linux kernel + initramfs + ext4 ルート）
+
 ## 0. ゴール（受入基準）
 1. UEFI → GRUB → Linux kernel 6.18.1 → initramfs（自作init）→ 永続 ext4（disk.img）へ `switch_root` が成立する
 2. 最終的な `/` は ext4（disk.img）で、再起動してもファイル・設定が保持される
@@ -74,11 +78,11 @@ mkdir -p ~/umu/umu_project/UmuOSver011/{kernel,initramfs,iso_root/boot/grub,logs
 
 ### 3.3 ブリッジ（br0）準備（静的IP/telnet検証用）
 
-目的：QEMU の `-nic bridge,br=br0` を使い、ゲストを LAN と同一 L2 に接続する。
+目的：QEMU の `-nic bridge,br=br0` を使い、UmuOS側を LAN と同一 L2 に接続する。
 
 前提：開発環境は Ubuntu 24.04 LTS（ProxmoxVE 9.1 上の VM）。Proxmox 側はブリッジ `vmbr0` を使用している。
 
-注意：この作業はホスト（Ubuntu）側のネットワーク構成を変更するため、SSH 作業中だと切断リスクがある。Proxmox のコンソール等、復旧できる経路を確保してから実施する。
+注意：この作業は開発マシン側（Ubuntu）のネットワーク構成を変更するため、SSH 作業中だと切断リスクがある。Proxmox のコンソール等、復旧できる経路を確保してから実施する。
 
 1) Ubuntu 側の物理NIC名を確認（例：`ens18`）
 ```bash
@@ -86,9 +90,9 @@ ip -br link
 ip route
 ```
 
-2) netplan で `br0` を作成（例：DHCPでホスト疎通を維持する場合）
+このプロジェクトの開発環境例：NIC は `ens18`、開発マシン側IP は `192.168.0.201/24`。
 
-`<IFNAME>` を 1) で確認した NIC 名に置換する。
+2) netplan で `br0` を作成（開発マシン側も静的IPの例）
 
 ```bash
 sudo tee /etc/netplan/01-br0.yaml >/dev/null <<'EOF'
@@ -96,12 +100,18 @@ network:
   version: 2
   renderer: networkd
   ethernets:
-    <IFNAME>:
+    ens18:
       dhcp4: no
   bridges:
     br0:
-      interfaces: [<IFNAME>]
-      dhcp4: yes
+      interfaces: [ens18]
+      dhcp4: no
+      addresses: [192.168.0.201/24]
+      routes:
+        - to: default
+          via: 192.168.0.1
+      nameservers:
+        addresses: [8.8.8.8]
       parameters:
         stp: false
         forward-delay: 0
@@ -110,7 +120,7 @@ EOF
 sudo netplan apply
 ```
 
-ホスト側を静的IPにしている場合は、`br0` に `addresses` / `routes` / `nameservers` を設定し、`dhcp4: yes` は使わない。
+開発マシン側も静的IPで固定する（DHCPは使わない）。`addresses` / `routes` / `nameservers` は環境に合わせて調整する。
 
 3) `br0` ができたことを確認
 ```bash
@@ -277,7 +287,7 @@ tama:x:1000:1000:tama:/home/tama:/bin/sh
 
 `/etc/shadow` は環境ごとに作成する（ハッシュを設計書に直書きしない）。
 /etcは755なのでsudo vim 。。。しないと書き込めないので注意
-ホストで生成例（SHA-512）：
+開発マシン側で生成例（SHA-512）：
 ```bash
 openssl passwd -6
 ```
