@@ -506,11 +506,17 @@ if [ -f "$CONF" ]; then
 fi
 
 if [ -n "$IP" ] && [ -n "$GW" ]; then
-  ip link set "$IFNAME" up
-  ip addr show dev "$IFNAME" | grep -Fq "inet $IP" || ip addr add "$IP" dev "$IFNAME"
-  ip route replace default via "$GW" dev "$IFNAME"
-  [ -n "$DNS" ] && echo "nameserver $DNS" > /etc/resolv.conf
-  log "[rcS] net: IF=$IFNAME IP=$IP GW=$GW DNS=$DNS"
+  # BusyBox の ip は、存在しないIFでも終了コードが信用できないことがある。
+  # /sys/class/net を見て確実に判定する。
+  if [ -d "/sys/class/net/$IFNAME" ]; then
+    ip link set "$IFNAME" up
+    ip addr show dev "$IFNAME" | grep -Fq "inet $IP" || ip addr add "$IP" dev "$IFNAME"
+    ip route replace default via "$GW" dev "$IFNAME"
+    [ -n "$DNS" ] && echo "nameserver $DNS" > /etc/resolv.conf
+    log "[rcS] net: IF=$IFNAME IP=$IP GW=$GW DNS=$DNS"
+  else
+    log "[rcS] net: skip (no such IF: $IFNAME)"
+  fi
 else
   log "[rcS] net: skip (IP/GW not set)"
 fi
