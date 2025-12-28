@@ -1,4 +1,4 @@
-# UmuOS var0.1.1 詳細設計（改訂：再現性・観測性・失敗対策を仕様化）
+# UmuOS ver0.1.1 詳細設計（改訂：再現性・観測性・失敗対策を仕様化）
 
 この詳細設計は [UmuOSver011基本計画.md](../UmuOSver011基本計画.md) の受入基準を満たすための「作業手順＋仕様」のたたき台。
 
@@ -46,7 +46,6 @@
 - initramfs の自作 init は「UUID → 実デバイス名」を **自前で解決**して mount する
   - つまり `mount UUID=...` には依存しない（udev不要・再現性重視）
 - 観測性のため `console=tty0 console=ttyS0,115200n8` を固定し、QEMUはシリアル出力で起動ログを見る
-- 観測性のため `console=tty0 console=ttyS0,115200n8` を固定し、QEMUはシリアル出力で起動ログを見る
 - 本開発環境の QEMU は **ソフトウェアエミュレーション（`accel=tcg`）を前提**とし、KVM（ネストKVMや `/dev/kvm` の有無）は考慮対象外とする
 
 ---
@@ -79,6 +78,11 @@ mkdir -p ~/umu/umu_project/UmuOSver011/{kernel,initramfs,iso_root/boot/grub,logs
 ```
 
 ### 3.3 ブリッジ（br0）準備（静的IP/telnet検証用）
+
+位置づけ：この章は **必須の事前準備ではない**（ネットワーク検証が必要なときのみ）。
+
+- まずは 4〜10.2（ネット無し）で「UEFI→GRUB→kernel→initramfs→ext4→switch_root」まで成立させる
+- 静的IP/telnet の検証に進む段階（10.3 を実行する直前）で、この 3.3 を実施する
 
 目的：QEMU の `-nic bridge,br=br0` を使い、UmuOS側を LAN と同一 L2 に接続する。
 
@@ -299,6 +303,19 @@ cp ../initrd.img-6.18.1 ~/umu/umu_project/UmuOSver011/iso_root/boot/
 ls -lh ~/umu/umu_project/UmuOSver011/iso_root/boot/initrd.img-6.18.1
 ```
 
+任意（推奨）：initrd の中身（最低限 `/init` と `/bin/switch_root`）を軽く確認する。
+
+`lsinitramfs` が使える場合（`initramfs-tools` 由来）：
+```bash
+lsinitramfs ~/umu/umu_project/UmuOSver011/initramfs/initrd.img-6.18.1 | head -n 30
+```
+
+`lsinitramfs` が無い場合（代替：gzip+cpio で一覧）：
+```bash
+cd ~/umu/umu_project/UmuOSver011/initramfs
+zcat initrd.img-6.18.1 | cpio -t | head -n 30
+```
+
 ---
 
 ## 7. ext4ルート（disk.img）へ rootfs を作成（switch_root後）
@@ -328,10 +345,12 @@ sudo ./busybox --install -s .
 ```
 
 ### 7.3 ユーザー/認証
-`/etc/passwd`：/etcは755なのでsudo vim 。。。しないと書き込めないので注意
-```text
+`/etc/passwd` を作成：
+```bash
+sudo tee /mnt/umuos011/etc/passwd >/dev/null <<'EOF'
 root:x:0:0:root:/root:/bin/sh
 tama:x:1000:1000:tama:/home/tama:/bin/sh
+EOF
 ```
 
 `/etc/shadow` は環境ごとに作成する（ハッシュを設計書に直書きしない）。
@@ -366,14 +385,16 @@ sudo chown -R 1000:1000 /mnt/umuos011/home/tama
 ```
 
 ### 7.4 BusyBox init（inittab/rcS）
-`/etc/inittab`（最小）：　/etcは755なのでsudo vim 。。。しないと書き込めないので注意
-```sh
+`/etc/inittab` を作成（最小）：
+```bash
+sudo tee /mnt/umuos011/etc/inittab >/dev/null <<'EOF'
 ::sysinit:/etc/init.d/rcS
 
 ttyS0::respawn:/bin/getty -L 115200 ttyS0 vt100
 
 ::ctrlaltdel:/bin/reboot
 ::shutdown:/bin/umount -a -r
+EOF
 ```
 
 方針：ver0.1.1 は `-nographic` 前提とし、ログインおよび受入テストの入口はシリアルコンソール（`ttyS0`）に固定する。
@@ -391,8 +412,9 @@ sudo chown root:root /mnt/umuos011/etc/securetty
 sudo chmod 644 /mnt/umuos011/etc/securetty
 ```
 
-`/etc/init.d/rcS`（最小：ログ + FS + ネット + 任意telnet）：　/etcは755なのでsudo vim 。。。しないと書き込めないので注意
-```sh
+`/etc/init.d/rcS` を作成（最小：ログ + FS + ネット + 任意telnet）：
+```bash
+sudo tee /mnt/umuos011/etc/init.d/rcS >/dev/null <<'EOF'
 #!/bin/sh
 
 PATH=/sbin:/bin
@@ -432,6 +454,7 @@ if [ "$TELNET_ENABLE" = "1" ]; then
   telnetd -l /bin/login
   log "[rcS] telnetd started"
 fi
+EOF
 ```
 
 権限：
@@ -442,13 +465,15 @@ sudo chmod 755 /mnt/umuos011/etc/init.d/rcS
 ```
 
 ### 7.5 ネットワーク設定ファイル（ext4側）
-`/etc/umu/network.conf`：
-```text
+`/etc/umu/network.conf` を作成：
+```bash
+sudo tee /mnt/umuos011/etc/umu/network.conf >/dev/null <<'EOF'
 IFNAME=eth0
 IP=192.168.0.204/24
 GW=192.168.0.1
 DNS=8.8.8.8
 TELNET_ENABLE=0
+EOF
 ```
 
 権限：
@@ -489,6 +514,12 @@ menuentry "UmuOS 0.1.1 rescue (single)" {
 }
 ```
 
+確認（推奨）：
+```bash
+grep -n 'root=UUID=' ~/umu/umu_project/UmuOSver011/iso_root/boot/grub/grub.cfg
+sudo blkid -p -o value -s UUID ~/umu/umu_project/UmuOSver011/disk/disk.img
+```
+
 ---
 
 ## 9. ISO作成
@@ -505,6 +536,8 @@ ls -lh UmuOSver011-boot.iso
 ### 10.1 OVMF VARS をプロジェクト内に固定（推奨）
 `/tmp` は掃除されやすく、挙動が変わる原因になるのでプロジェクト内に置く。
 
+このファイルが無いと、10.2 のQEMUコマンド（`-drive ...file=run/OVMF_VARS_umuos011.fd`）が起動直後に失敗する。
+
 OVMFパスが分からない場合：
 ```bash
 dpkg -L ovmf | grep -E 'OVMF_(CODE|VARS).*fd$'
@@ -512,7 +545,35 @@ dpkg -L ovmf | grep -E 'OVMF_(CODE|VARS).*fd$'
 
 例（存在するパスに合わせて調整）：
 ```bash
-cp -n /usr/share/OVMF/OVMF_VARS_4M.fd ~/umu/umu_project/UmuOSver011/run/OVMF_VARS_umuos011.fd
+mkdir -p ~/umu/umu_project/UmuOSver011/run
+cp --update=none /usr/share/OVMF/OVMF_VARS_4M.fd ~/umu/umu_project/UmuOSver011/run/OVMF_VARS_umuos011.fd
+```
+
+確認（推奨）：
+```bash
+ls -lh ~/umu/umu_project/UmuOSver011/run/OVMF_VARS_umuos011.fd
+```
+
+### 10.1.1 起動前チェックリスト（ここまでで「現状まで再現できた」を判定）
+
+以下がすべて揃っていれば、10.2 に進んでよい。
+
+1) 成果物の存在確認：
+```bash
+cd ~/umu/umu_project/UmuOSver011
+ls -lh UmuOSver011-boot.iso \
+  iso_root/boot/vmlinuz-6.18.1 \
+  iso_root/boot/initrd.img-6.18.1 \
+  iso_root/boot/grub/grub.cfg \
+  run/OVMF_VARS_umuos011.fd \
+  disk/disk.img
+```
+
+2) `root=UUID=...` と disk.img UUID の一致確認：
+```bash
+cd ~/umu/umu_project/UmuOSver011
+grep -n 'root=UUID=' iso_root/boot/grub/grub.cfg
+sudo blkid -p -o value -s UUID disk/disk.img
 ```
 
 ### 10.2 QEMU（ネット無し・観測性最大）
