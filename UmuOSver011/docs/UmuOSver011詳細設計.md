@@ -16,8 +16,9 @@
 1. UEFI → GRUB → Linux kernel 6.18.1 → initramfs（自作init）→ 永続 ext4（disk.img）へ `switch_root` が成立する
 2. 最終的な `/` は ext4（disk.img）で、再起動してもファイル・設定が保持される
 3. `root` / `tama` ユーザーでログインできる（BusyBox init/getty/login を利用）
-4. 静的IP（DHCPなし）：`192.168.0.204/24`、GW `192.168.0.1`、DNS `8.8.8.8`
-5. telnet（開発用途・必要時のみ）で接続し、loginできる
+4. ネットワーク到達性（開発用途）は、次のいずれかで成立する
+  - **推奨（安定）**：QEMU user networking（NAT）+ port forward により、開発マシンから telnet で接続し login できる
+  - **任意（LAN直結が必要な場合のみ）**：静的IP（DHCPなし）：`192.168.0.204/24`、GW `192.168.0.1`、DNS `8.8.8.8` で起動し、同一LANから telnet で接続し login できる
 6. `/logs/boot.log` が永続化され、再起動後も追記される
 
 成功＝「QEMU で再現でき、上記がすべて満たされる」
@@ -82,7 +83,8 @@ mkdir -p ~/umu/umu_project/UmuOSver011/{kernel,initramfs,iso_root/boot/grub,logs
 位置づけ：この章は **必須の事前準備ではない**（ネットワーク検証が必要なときのみ）。
 
 - まずは 4〜10.2（ネット無し）で「UEFI→GRUB→kernel→initramfs→ext4→switch_root」まで成立させる
-- 静的IP/telnet の検証に進む段階（10.3 を実行する直前）で、この 3.3 を実施する
+- ブリッジ（LAN直結）による静的IP/telnet の検証に進む段階（10.4 を実行する直前）で、この 3.3 を実施する
+- NAT（10.3）での検証だけなら、この 3.3 は不要
 
 目的：QEMU の `-nic bridge,br=br0` を使い、UmuOS側を LAN と同一 L2 に接続する。
 
@@ -150,6 +152,52 @@ sudo chmod 644 /etc/qemu/bridge.conf
 - Proxmox の VM の NIC が `vmbr0` に接続されていること
 - Proxmox の firewall を有効化している場合、ブリッジ配下で複数MACが流れる構成（ネストブリッジ）が止められることがある。
   その場合は firewall 設定を見直す（まずは検証のために無効化して切り分ける）。
+
+### 3.3.1 障害時メモ（Proxmox の `vmbr0` がハングした疑い）
+
+想定：開発マシン（Ubuntu VM）で br0 を作った／QEMU を `-nic bridge,br=br0` で起動した後に、Proxmox 側の `vmbr0` 配下で通信断や高負荷が発生した。
+
+最優先：**SSH だけで復旧しようとしない**。必ず Proxmox のローカルコンソール（datacenter/ノードのコンソール、IPMI、物理コンソール）を確保してから実施する。
+
+#### 1) まず採取（原因追跡用）
+Proxmox ホスト上で、状態を残す（復旧の前に最低限だけでも）。
+
+```bash
+date
+ip -br link
+ip -br addr
+ip route
+bridge link
+ip -s link show vmbr0
+dmesg -T | tail -n 200
+```
+
+#### 2) 影響を止める（ループ/ストーム疑いのとき）
+- 直前に追加/変更した VM（特にブリッジやL2を喋る VM）を一旦停止する（Ubuntu開発VM、テスト中のゲストなど）
+- Proxmox の firewall が絡む疑いがある場合は、切り分けとして一時停止する
+
+```bash
+systemctl stop pve-firewall
+```
+
+#### 3) 最小の復旧操作（順番固定）
+ifupdown2 を前提に、まずは設定適用のやり直しを試す。
+
+```bash
+ifreload -a
+```
+
+改善しない場合（※この操作でネットワーク断が起きうるため、必ずコンソールから実施）：
+
+```bash
+ifdown vmbr0
+ifup vmbr0
+```
+
+#### 4) 再発防止（まずは安全側）
+- L2 ループを疑う場合：Proxmox 側の `vmbr0` / Ubuntu 側の `br0` で STP を有効化するのを検討する（検証環境でのみ）
+- 検証の基本は「ネット無しで受入（4〜10.2）→NAT（10.3）→（必要時のみ）ブリッジ（10.4）」を厳守する
+- br0/ブリッジが不安定なら、QEMU は user-mode NAT（ポートフォワード）で代替し、`vmbr0` を触らない
 
 ---
 
@@ -350,8 +398,15 @@ sudo ln -sf /bin/busybox /mnt/umuos011/sbin/init
 
 BusyBox applet（ext4側）：
 ```bash
-cd /mnt/umuos011/bin
-sudo ./busybox --install -s .
+# 重要：ホスト側（/mnt/umuos011/...）でそのまま --install すると、
+# symlink が「/mnt/umuos011/bin/busybox」のような絶対パスになり、UmuOS起動時に壊れる。
+# chroot して、UmuOS 側のパス（/bin/busybox）基準で symlink を作る。
+
+sudo chroot /mnt/umuos011 /bin/busybox --install -s /bin
+sudo chroot /mnt/umuos011 /bin/busybox --install -s /sbin
+
+# 例：/bin/sh -> /bin/busybox になっていること
+sudo ls -l /mnt/umuos011/bin/sh
 ```
 
 ### 7.3 ユーザー/認証
@@ -476,6 +531,25 @@ sudo chmod 755 /mnt/umuos011/etc/init.d/rcS
 
 ### 7.5 ネットワーク設定ファイル（ext4側）
 `/etc/umu/network.conf` を作成：
+
+このファイルは「NAT（推奨）」と「ブリッジ（LAN直結）」で内容が変わる。
+
+#### 7.5.1 NAT（推奨：安定運用）
+QEMU user networking（NAT）のデフォルトサブネット（`10.0.2.0/24`）に合わせる。
+
+```bash
+sudo tee /mnt/umuos011/etc/umu/network.conf >/dev/null <<'EOF'
+IFNAME=eth0
+IP=10.0.2.15/24
+GW=10.0.2.2
+DNS=8.8.8.8
+TELNET_ENABLE=0
+EOF
+```
+
+#### 7.5.2 ブリッジ（LAN直結が必要な場合のみ）
+同一LANに `192.168.0.204/24` を出す。
+
 ```bash
 sudo tee /mnt/umuos011/etc/umu/network.conf >/dev/null <<'EOF'
 IFNAME=eth0
@@ -608,7 +682,34 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=tcg -cpu max \
 
 ログイン/操作の入口：シリアルコンソール（`ttyS0`）。`-nographic` のため VGA 出力は前提にしない。
 
-### 10.3 QEMU（ブリッジ：静的IP/telnet確認）
+### 10.3 QEMU（NAT：推奨・安定運用）
+```bash
+cd ~/umu/umu_project/UmuOSver011
+
+qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=tcg -cpu max \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+  -drive if=pflash,format=raw,file=run/OVMF_VARS_umuos011.fd \
+  -cdrom UmuOSver011-boot.iso -boot d \
+  -drive file=disk/disk.img,if=virtio,format=raw \
+  -nic user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:2223-:23 \
+  -nographic \
+  -serial stdio \
+  -monitor none
+```
+
+このモードでは、UmuOS は NAT 配下（例：`10.0.2.15/24`）で動作する。
+
+telnet 接続（開発マシン上）：
+```bash
+telnet 127.0.0.1 2223
+```
+
+（運用案②）外部PCからアクセスしたい場合は「外部PC → UbuntuへSSH → Ubuntu上で telnet 127.0.0.1 2223」とする（telnet をLANに露出させない）。
+
+### 10.4 QEMU（ブリッジ：LAN直結が必要な場合のみ）
+
+注意：静的IP（`192.168.0.204/24`）を成立させるため、user networking（NAT）ではなく L2 ブリッジ接続を前提とする。
+
 ```bash
 cd ~/umu/umu_project/UmuOSver011
 
@@ -625,8 +726,6 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=tcg -cpu max \
 
 `br0` は環境のブリッジ名に合わせて変更する。
 
-注意：静的IP（192.168.0.204/24）を成立させるため、user networking（NAT）ではなく L2 ブリッジ接続を前提とする。
-
 ---
 
 ## 11. 動作確認（受入基準の確認手順）
@@ -641,17 +740,19 @@ qemu-system-x86_64 -m 2048 -smp 2 -machine q35,accel=tcg -cpu max \
 ### 11.2 ログ
 - `/logs/boot.log` が存在し、再起動後も追記される
 
-### 11.3 ネットワーク（静的IP）
-- `ip addr` / `ip route` で `192.168.0.204/24` と default route が入っている
+### 11.3 ネットワーク（NAT/ブリッジ）
+- NAT（推奨）：`ip addr` / `ip route` で `10.0.2.15/24` と `default via 10.0.2.2` が入っている
+- ブリッジ（LAN直結）：`ip addr` / `ip route` で `192.168.0.204/24` と default route が入っている
 
 ### 11.4 telnet
-- `TELNET_ENABLE=1` の時のみ `telnet 192.168.0.204` で接続でき、loginできる
+- `TELNET_ENABLE=1` の時のみ接続でき、loginできる
+  - NAT（推奨）：開発マシン上で `telnet 127.0.0.1 2223`
+  - ブリッジ（LAN直結）：同一LANから `telnet 192.168.0.204`
 
 telnet 接続の切り分け順序（固定）：
-1) L3疎通（ICMP）：開発マシン側または同一LANの別ホストから `ping 192.168.0.204`
-2) L2疎通（ARP）：`arp -n` などで `192.168.0.204` の MAC 解決を確認
-3) UmuOS側の状態：UmuOS側で `ip addr` / `ip route` を確認
-4) telnet（最後）：上記が成立してから `TELNET_ENABLE=1` の時のみ試す
+1) UmuOS側の状態：UmuOS側で `ip addr` / `ip route` を確認
+2) NAT の場合：QEMU の `hostfwd` 設定があることを確認し、開発マシン上で `telnet 127.0.0.1 2223`
+3) ブリッジの場合：L3疎通（ICMP）`ping 192.168.0.204` → L2疎通（ARP）→ telnet `192.168.0.204`
 
 ---
 
