@@ -257,8 +257,12 @@ file /bin/busybox
 BusyBox applet（initramfs側）：
 ```bash
 cd ~/umu/umu_project/UmuOSver011/initramfs/rootfs/bin
-./busybox --install -s .
+sudo ln -sf busybox switch_root
 ```
+
+注意：`busybox --install -s .` をそのまま実行すると、環境によっては「ホスト側の絶対パス」を指す symlink が大量に作られ、initramfs 起動時に `ENOENT` で壊れることがある。
+
+0.1.1 の initramfs で最低限必要なのは `/bin/switch_root` のため、まずは上記の相対リンクで確実に用意する。
 
 ### 6.2 自作 init（C言語）仕様（ここが0.1.1の中核）
 
@@ -314,6 +318,12 @@ lsinitramfs ~/umu/umu_project/UmuOSver011/initramfs/initrd.img-6.18.1 | head -n 
 ```bash
 cd ~/umu/umu_project/UmuOSver011/initramfs
 zcat initrd.img-6.18.1 | cpio -t | head -n 30
+```
+
+追加確認（推奨）：`/bin/switch_root` が「相対リンク（`-> busybox`）」になっていること。
+```bash
+cd ~/umu/umu_project/UmuOSver011/initramfs
+zcat initrd.img-6.18.1 | cpio -itv bin/switch_root
 ```
 
 ---
