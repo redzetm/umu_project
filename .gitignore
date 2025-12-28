@@ -125,3 +125,24 @@ step4/iso_root.backup.*
 UmuOSver01/initramfs/rootfs/etc/shadow
 UmuOSver011/initramfs/rootfs/etc/shadow
 UmuOSver011_失敗/initramfs/rootfs/etc/shadow
+
+# BusyBox 関連の一時ファイル
+fix_busybox_applets.*
+
+# QEMU 実行ログ・エラー・PID
+qemu_*.err
+qemu_*.pid
+serial_*.log
+
+# ネットワーク設定断片
+network.conf.nat
+
+# rcS 系の一時ファイル
+rcS.fixed*
+rc5.fixed*
+
+# その他の一時ファイル
+*.out
+*.log
+*.tmp
+
