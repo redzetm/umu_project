@@ -223,6 +223,7 @@ static int parse_root_uuid_from_cmdline(uint8_t out_uuid[UUID_BIN_LEN])
 
 	char uuid_str[UUID_STR_MAX];
 	uuid_to_string(out_uuid, uuid_str);
+	log_printf("[init] cmdline parsed: root=UUID=%s", uuid_str);
 	log_printf("[init] want root UUID: %s", uuid_str);
 	return 0;
 }
@@ -405,6 +406,7 @@ int main(void)
 	if (mount_if_needed("devtmpfs", "/dev", "devtmpfs", 0, "") != 0) {
 		emergency_loop();
 	}
+	log_printf("[init] devtmpfs mounted");
 	if (mount_if_needed("devpts", "/dev/pts", "devpts", 0, "") != 0) {
 		emergency_loop();
 	}
@@ -430,14 +432,33 @@ int main(void)
 			continue;
 		}
 
+		log_printf("[init] root device found: %s", dev_path);
+
 		log_printf("[init] mounting root: dev=%s -> /newroot", dev_path);
 		if (ensure_dir("/newroot", 0755) != 0) {
 			emergency_loop();
 		}
 
-		/* 設計通り rw を明示する（MS_RDONLY は付けない） */
-		if (mount(dev_path, "/newroot", "ext4", 0, "rw") == 0) {
+		/* 設計通り rw（MS_RDONLY は付けない）。data は空で安全側。 */
+		if (mount(dev_path, "/newroot", "ext4", 0, "") == 0) {
 			log_printf("[init] mount root ok (rw): %s", dev_path);
+			log_printf("[init] mounted /newroot");
+
+			/* 混線防止: 永続側へは書かない。存在だけ確認してログに出す。 */
+			if (access("/newroot/sbin/init", F_OK) != 0) {
+				log_printf("[init] warn: /newroot/sbin/init not found: errno=%d (%s)", errno, strerror(errno));
+			}
+			if (access("/newroot/etc/inittab", F_OK) != 0) {
+				log_printf("[init] warn: /newroot/etc/inittab not found: errno=%d (%s)", errno, strerror(errno));
+			}
+			if (access("/newroot/etc/init.d/rcS", F_OK) != 0) {
+				log_printf("[init] warn: /newroot/etc/init.d/rcS not found: errno=%d (%s)", errno, strerror(errno));
+			}
+			if (access("/bin/switch_root", X_OK) != 0) {
+				log_printf("[init] warn: /bin/switch_root not executable in initramfs: errno=%d (%s)", errno,
+					  strerror(errno));
+			}
+
 			mounted = true;
 			break;
 		}
@@ -457,6 +478,7 @@ int main(void)
 	}
 
 	/* 4) switch_root */
+	log_printf("[init] switching root");
 	log_printf("[init] exec: /bin/switch_root /newroot /sbin/init");
 
 	char *const argv[] = {
