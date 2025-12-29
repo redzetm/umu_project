@@ -77,6 +77,10 @@ echo "[umuOSstart] OVMF_VARS=$VARS_PATH"
 cd "$PROJECT_DIR"
 
 # exec を使うと、このシェルが QEMU プロセスに置き換わる（終了コードが素直になる）
+# ここから下は「QEMUの起動オプション」。困ったらこのブロックだけを見ればOK。
+#
+# 重要：バックスラッシュ（\）で行を継続している途中にコメント行（# ...）を挟むと、
+# うっかり後続オプションがコメントアウトされて起動が壊れることがある。
 exec qemu-system-x86_64 \
 	-machine q35,accel=tcg \
 	-m "$MEM_MB" \
@@ -85,10 +89,8 @@ exec qemu-system-x86_64 \
 	-drive if=pflash,format=raw,file="$VARS_PATH" \
 	-cdrom "$ISO_PATH" \
 	-drive file="$DISK_PATH",format=raw,if=virtio \
-	# GUI無しでシリアル（ttyS0）に全部出す：ログが取りやすい
+	-display none \
 	-nographic \
-	# QEMU の画面出力を端末に出す
 	-serial stdio \
-	# QEMU monitor を消して混線しにくくする
 	-monitor none
 
