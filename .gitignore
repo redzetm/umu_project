@@ -135,3 +135,4 @@ rc5.fixed*
 *.log
 *.tmp
 
+UmuOS-0.1.1/initramfs/initrd.img-6.18.1
