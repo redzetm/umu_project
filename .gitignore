@@ -9,7 +9,6 @@ step3/kernel/linux-*/
 step4/kernel/linux-*/
 UmuOSver01/kernel/linux-*/
 UmuOSver011/kernel/linux-*/
-UmuOSver011_失敗/kernel/linux-*/
 UmuOS-0.1.1/kernel/linux-*/
 
 # カーネルアーカイブ
@@ -19,7 +18,6 @@ step3/kernel/*.tar.xz
 step4/kernel/*.tar.xz
 UmuOSver01/kernel/*.tar.xz
 UmuOSver011/kernel/*.tar.xz
-UmuOSver011_失敗/kernel/*.tar.xz
 UmuOS-0.1.1/kernel/*.tar.xz
 
 # initramfs 関連の一時ファイル
@@ -41,9 +39,6 @@ UmuOSver01/initramfs/*.img
 UmuOSver011/initramfs/modules/
 UmuOSver011/initramfs/extracted/
 UmuOSver011/initramfs/*.img
-UmuOSver011_失敗/initramfs/modules/
-UmuOSver011_失敗/initramfs/extracted/
-UmuOSver011_失敗/initramfs/*.img
 UmuOS-0.1.1/initramfs/modules/
 UmuOS-0.1.1/initramfs/extracted/
 UmuOS-0.1.1/initramfs/*.img
@@ -54,13 +49,11 @@ step3/initramfs/rootfs/bin/*
 step4/initramfs/rootfs/bin/*
 UmuOSver01/initramfs/rootfs/bin/*
 UmuOSver011/initramfs/rootfs/bin/*
-UmuOSver011_失敗/initramfs/rootfs/bin/*
 UmuOS-0.1.1/initramfs/rootfs/bin/*
 
 # initramfs のビルド成果物（PID1バイナリなど）
 UmuOSver01/initramfs/rootfs/init
 UmuOSver011/initramfs/rootfs/init
-UmuOSver011_失敗/initramfs/rootfs/init
 UmuOS-0.1.1/initramfs/rootfs/init
 
 # ISO イメージ
@@ -76,8 +69,6 @@ UmuOSver01/*.iso
 UmuOSver01/OVMF_VARS_custom.fd
 UmuOSver011/*.iso
 UmuOSver011/OVMF_VARS_custom.fd
-UmuOSver011_失敗/*.iso
-UmuOSver011_失敗/OVMF_VARS_custom.fd
 UmuOS-0.1.1/*.iso
 
 # OVMF VARS（プロジェクト内固定）
@@ -90,7 +81,6 @@ step3/logs/*.log
 step4/logs/*.log
 UmuOSver01/logs/*.log
 UmuOSver011/logs/*.log
-UmuOSver011_失敗/logs/*.log
 UmuOS-0.1.1/logs/*.log
 
 # ビルド成果物（iso_root 内）
@@ -106,8 +96,6 @@ UmuOSver01/iso_root/boot/vmlinuz-*
 UmuOSver01/iso_root/boot/initrd.img-*
 UmuOSver011/iso_root/boot/vmlinuz-*
 UmuOSver011/iso_root/boot/initrd.img-*
-UmuOSver011_失敗/iso_root/boot/vmlinuz-*
-UmuOSver011_失敗/iso_root/boot/initrd.img-*
 UmuOS-0.1.1/iso_root/boot/vmlinuz-*
 UmuOS-0.1.1/iso_root/boot/initrd.img-*
 UmuOS-0.1.1/iso_root/boot/config-*
@@ -115,23 +103,8 @@ UmuOS-0.1.1/iso_root/boot/config-*
 # 永続ストレージ（ext4イメージ）
 UmuOSver01/disk/*.img
 UmuOSver011/disk/*.img
-UmuOSver011_失敗/disk/*.img
 UmuOS-0.1.1/disk/*.img
 
-
-# バックアップディレクトリ
-step1/kernel.backup.*
-step1/initramfs.backup.*
-step1/iso_root.backup.*
-step2/kernel.backup.*
-step2/initramfs.backup.*
-step2/iso_root.backup.*
-step3/kernel.backup.*
-step3/initramfs.backup.*
-step3/iso_root.backup.*
-step4/kernel.backup.*
-step4/initramfs.backup.*
-step4/iso_root.backup.*
 
 # エディタの一時ファイル
 *~
@@ -140,7 +113,6 @@ step4/iso_root.backup.*
 .DS_Store
 UmuOSver01/initramfs/rootfs/etc/shadow
 UmuOSver011/initramfs/rootfs/etc/shadow
-UmuOSver011_失敗/initramfs/rootfs/etc/shadow
 UmuOS-0.1.1/initramfs/rootfs/etc/shadow
 
 # BusyBox 関連の一時ファイル
