@@ -54,13 +54,7 @@ static void log_printf(const char *fmt, ...)
 		}
 	}
 
-	/* 可能なら /dev/console にも出す（ttyS0 観測の取りこぼし対策） */
-	int fd = open("/dev/console", O_WRONLY | O_CLOEXEC);
-	if (fd >= 0) {
-		(void)write(fd, buf, len);
-		close(fd);
-	}
-
+	/* stderr に集約（/dev/console と二重出力になることがあるため） */
 	(void)write(2, buf, len);
 	fflush(stderr);
 }
