@@ -136,3 +136,14 @@ rc5.fixed*
 *.tmp
 
 UmuOS-0.1.1/initramfs/initrd.img-6.18.1
+
+# ============================
+# UmuOS 研究構造用 追加設定
+# ============================
+
+# 外部参照コード（研究対象そのもの）
+# GNU coreutils / Linux kernel など
+external/
+
+# analysis は研究成果なので ignore しない
+# （ここには roff / md のみを置く）
