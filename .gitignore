@@ -153,3 +153,4 @@ work/
 # analysis は研究成果なので ignore しない
 # （ここには roff / md のみを置く）
 
+.vscode/tasks.json
