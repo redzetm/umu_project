@@ -154,3 +154,7 @@ work/
 # （ここには roff / md のみを置く）
 
 .vscode/tasks.json
+UmuOS-0.1.1/initramfs/initrd.cpio
+UmuOS-0.1.1/initramfs/initrd.cpio.list
+UmuOS-0.1.1/initramfs/initrd.filelist0
+UmuOS-0.1.1/initramfs/initrd.list
