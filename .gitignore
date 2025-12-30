@@ -145,5 +145,11 @@ UmuOS-0.1.1/initramfs/initrd.img-6.18.1
 # GNU coreutils / Linux kernel など
 external/
 
+# 実験・改変・検証用作業ディレクトリ
+# printf / assert / ビルド / 破壊など自由に行う場所
+# 成果物ではないため Git 管理しない
+work/
+
 # analysis は研究成果なので ignore しない
 # （ここには roff / md のみを置く）
+
