@@ -106,7 +106,7 @@ UmuOSver011/disk/*.img
 UmuOS-0.1.1/disk/*.img
 
 
-# エディタの一時ファイル
+# エディタの一時ファイル 
 *~
 *.swp
 *.swo
