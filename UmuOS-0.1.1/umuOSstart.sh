@@ -93,4 +93,3 @@ exec qemu-system-x86_64 \
 	-nographic \
 	-serial stdio \
 	-monitor none
-
