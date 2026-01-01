@@ -183,8 +183,7 @@ if [[ -n "${OUT_PARENT:-}" ]]; then
 	DEFAULT_OUT_PARENT="$OUT_PARENT"
 fi
 
-read -r -p "生成先の親ディレクトリのフルパスを入力してください。入力したフルパスにそのまま作成されます。\
-（この直下に UmuOS-0.1.1/ を作ります）（例）[${DEFAULT_OUT_PARENT}]: " OUT_PARENT
+read -r -p $'生成先の親ディレクトリのフルパスを入力してください。入力したフルパスにそのまま作成されます。\n'"（この直下に UmuOS-0.1.1/ を作ります）（例）[${DEFAULT_OUT_PARENT}]: " OUT_PARENT
 if [[ -z "$OUT_PARENT" ]]; then
 	OUT_PARENT="$DEFAULT_OUT_PARENT"
 fi
