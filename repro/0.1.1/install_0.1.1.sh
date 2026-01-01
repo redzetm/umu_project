@@ -66,19 +66,14 @@ TARGET_START_SH=""
 usage() {
 	cat <<'USAGE'
 使い方:
-	./install_0.1.1.sh [--yes] [--out-parent <dir>]
-
-オプション:
-	--yes                 確認プロンプト無しで再生成（危険。CI用途のみ推奨）
-	--out-parent <dir>    生成先の親ディレクトリ（この直下に UmuOS-0.1.1/ を作る）
+	./install_0.1.1.sh
 
 入力（対話または環境変数）:
-	ROOT_PW, USER_NAME, USER_PW
-	OUT_PARENT            生成先の親ディレクトリ（--out-parent と同等）
+	USER_NAME             ユーザ名（プロンプトのデフォルトとして利用）
+	OUT_PARENT            生成先の親ディレクトリ（プロンプトのデフォルトとして利用）
 
 例:
-	OUT_PARENT=~/umu_project/work ./install_0.1.1.sh
-	./install_0.1.1.sh --out-parent ~/umu_project/work
+	./install_0.1.1.sh
 
 USAGE
 }
@@ -148,35 +143,15 @@ debugfs_dump_edit_write() {
 	debugfs -w -R "write ${tmp_in} ${path_in_img}" "$img" >/dev/null 2>&1
 }
 
-ASSUME_YES=0
-OUT_PARENT_ARG=""
-
-while [[ $# -gt 0 ]]; do
-	case "$1" in
-		--yes)
-			ASSUME_YES=1
-			shift
-			;;
-		--out-parent)
-			shift
-			if [[ $# -lt 1 ]]; then
-				echo "[install_0.1.1] ERROR: --out-parent requires a value" >&2
-				exit 1
-			fi
-			OUT_PARENT_ARG="$1"
-			shift
-			;;
-		-h|--help)
-			usage
-			exit 0
-			;;
-		*)
-			echo "[install_0.1.1] ERROR: unknown arg: $1" >&2
-			usage >&2
-			exit 1
-			;;
-	esac
-done
+if [[ ${1:-} == "-h" || ${1:-} == "--help" ]]; then
+	usage
+	exit 0
+fi
+if [[ $# -gt 0 ]]; then
+	echo "[install_0.1.1] ERROR: this installer is interactive-only; no CLI args are supported" >&2
+	usage >&2
+	exit 1
+fi
 
 need_cmd realpath
 
@@ -218,18 +193,20 @@ debugfs_path_exists() {
 	debugfs -R "stat ${path}" "$img" >/dev/null 2>&1
 }
 
-OUT_PARENT="${OUT_PARENT:-$OUT_PARENT_ARG}"
-
 DEFAULT_OUT_PARENT="$UMU_ROOT/work"
 if [[ ! -d "$DEFAULT_OUT_PARENT" ]]; then
 	DEFAULT_OUT_PARENT="$SCRIPT_DIR"
 fi
 
+# OUT_PARENT は環境変数をデフォルトとしてのみ扱い、必ず対話で確認する
+if [[ -n "${OUT_PARENT:-}" ]]; then
+	DEFAULT_OUT_PARENT="$OUT_PARENT"
+fi
+
+read -r -p "生成先の親ディレクトリのフルパスを入力してください。入力したフルパスにそのまま作成されます。\
+（この直下に UmuOS-0.1.1/ を作ります）（例）[${DEFAULT_OUT_PARENT}]: " OUT_PARENT
 if [[ -z "$OUT_PARENT" ]]; then
-	read -r -p "生成先の親ディレクトリ（この直下に UmuOS-0.1.1/ を作ります） [${DEFAULT_OUT_PARENT}]: " OUT_PARENT
-	if [[ -z "$OUT_PARENT" ]]; then
-		OUT_PARENT="$DEFAULT_OUT_PARENT"
-	fi
+	OUT_PARENT="$DEFAULT_OUT_PARENT"
 fi
 
 OUT_PARENT_EXPANDED="$OUT_PARENT"
@@ -256,33 +233,36 @@ require_base_file "$BASE_ISO_ROOT/boot/grub/grub.cfg"
 require_base_file "$BASE_START_SH"
 
 # --- 入力（最低限）---
-if [[ -z "${USER_NAME:-}" ]]; then
-	read -r -p "ユーザ名（例: tama）: " USER_NAME
+DEFAULT_USER_NAME="${USER_NAME:-}"
+read -r -p "一般ユーザ名（例: tama）${DEFAULT_USER_NAME:+ [${DEFAULT_USER_NAME}]}: " USER_NAME_IN
+if [[ -n "$USER_NAME_IN" ]]; then
+	USER_NAME="$USER_NAME_IN"
+elif [[ -n "$DEFAULT_USER_NAME" ]]; then
+	USER_NAME="$DEFAULT_USER_NAME"
+else
+	echo "[install_0.1.1] ERROR: USER_NAME is required" >&2
+	exit 1
 fi
 
-if [[ -z "${ROOT_PW:-}" ]]; then
-	read -r -s -p "root パスワード: " ROOT_PW
-	echo
-fi
-
-if [[ -z "${USER_PW:-}" ]]; then
-	read -r -s -p "${USER_NAME} のパスワード: " USER_PW
-	echo
-fi
+# パスワードは必ず対話で入力（環境変数は使わない）
+echo "root と ${USER_NAME} のパスワードを設定してください。"
+echo "（入力中は画面に表示されません）"
+read -r -s -p "root のパスワード: " ROOT_PW
+echo
+read -r -s -p "${USER_NAME} のパスワード: " USER_PW
+echo
 
 # --- 生成先の初期化（毎回クリーン）---
 mkdir -p -- "$OUT_PARENT_ABS"
 
 if [[ -e "$TARGET_DIR" ]]; then
-	if [[ $ASSUME_YES -eq 0 ]]; then
-		echo
-		echo "[install_0.1.1] WARNING: 既存の生成物を削除して作り直します。"
-		echo "[install_0.1.1]          削除対象: $TARGET_DIR"
-		read -r -p "続行する場合は YES と入力してください: " confirm
-		if [[ "$confirm" != "YES" ]]; then
-			echo "[install_0.1.1] ABORT: cancelled"
-			exit 1
-		fi
+	echo
+	echo "[install_0.1.1] WARNING: 既存の生成物を削除して作り直します。"
+	echo "[install_0.1.1]          削除対象: $TARGET_DIR"
+	read -r -p "続行する場合は YES と入力してください: " confirm
+	if [[ "$confirm" != "YES" ]]; then
+		echo "[install_0.1.1] ABORT: cancelled"
+		exit 1
 	fi
 
 	# 誤爆防止: ルート直下や想定外のパスを消さない
