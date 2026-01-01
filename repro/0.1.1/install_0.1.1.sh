@@ -67,13 +67,15 @@ usage() {
 	cat <<'USAGE'
 使い方:
 	./install_0.1.1.sh
+	上記コマンドを実行すると、対話形式でインストールが進みます。よく確認の上、必要な情報を入力してください。
 
 入力（対話または環境変数）:
 	USER_NAME             ユーザ名（プロンプトのデフォルトとして利用）
 	OUT_PARENT            生成先の親ディレクトリ（プロンプトのデフォルトとして利用）
+	その他、root と一般ユーザのパスワードは必ず対話で入力します。
 
 例:
-	./install_0.1.1.sh
+	./install_0.1.1.sh　　# 対話形式で UmuOS-0.1.1 を再現
 
 USAGE
 }
@@ -119,28 +121,6 @@ patch_grub_root_uuid() {
 	fi
 	# root=UUID=... の値だけを置換
 	sed -i -E "s/root=UUID=[0-9a-fA-F-]+/root=UUID=${uuid}/g" "$grub_cfg"
-}
-
-debugfs_dump_edit_write() {
-	local img="$1"
-	local path_in_img="$2"
-	local tmp_out="$3"
-	local tmp_in="$4"
-
-	debugfs -R "dump ${path_in_img} ${tmp_out}" "$img" >/dev/null 2>&1
-	if [[ ! -f "$tmp_out" ]]; then
-		echo "[install_0.1.1] ERROR: failed to dump ${path_in_img} from disk image" >&2
-		exit 1
-	fi
-
-	# tmp_out を編集して tmp_in を作る（呼び出し側が作る）
-	if [[ ! -f "$tmp_in" ]]; then
-		echo "[install_0.1.1] ERROR: expected edited file not found: $tmp_in" >&2
-		exit 1
-	fi
-
-	# 既存ファイルへ write することで、パーミッションを維持する
-	debugfs -w -R "write ${tmp_in} ${path_in_img}" "$img" >/dev/null 2>&1
 }
 
 if [[ ${1:-} == "-h" || ${1:-} == "--help" ]]; then
