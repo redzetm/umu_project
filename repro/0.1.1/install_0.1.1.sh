@@ -11,6 +11,7 @@
 # - 生成物は、このスクリプトと同じディレクトリ配下に閉じる
 # - 作り直しのたびに生成物を削除し、クリーンに初期化する（disk.img も毎回新規）
 
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}" )" && pwd)"
