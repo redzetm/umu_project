@@ -149,6 +149,7 @@ external/
 # printf / assert / ビルド / 破壊など自由に行う場所
 # 成果物ではないため Git 管理しない
 work/
+debug/
 
 # analysis は研究成果なので ignore しない
 # （ここには roff / md のみを置く）
