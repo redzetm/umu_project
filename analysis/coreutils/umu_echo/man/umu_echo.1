@@ -1,0 +1,41 @@
+.\" umu_echo(1) manual page
+.\" Date: 2026-01-02
+.TH UMU_ECHO 1 "2026-01-02" "UmuOS" "ユーザーコマンド"
+.SH 名前
+umu_echo \- 引数を標準出力へ表示する
+.SH 書式
+.B umu_echo
+.RI [ -n ]
+.RI [ STRING ...]
+.SH 説明
+.B umu_echo
+は、与えられた引数（
+.I STRING
+）を空白で連結し、標準出力へ出力します。
+引数がない場合は改行のみを出力します。
+.PP
+この実装は学習・解析用途の最小版であり、一般的な\fBecho\fPが持つ
+エスケープ解釈や長いオプション等は実装していません。
+.SH オプション
+.TP
+.B -n
+末尾の改行を出力しません。
+.SH 例
+.TP
+.B umu_echo hello world
+hello world
+.TP
+.B umu_echo -n hello
+hello
+(改行なし)
+.SH 終了ステータス
+常に 0 を返します。
+.SH 注意
+\fB-e\fP/\fB-E\fP によるバックスラッシュエスケープの解釈、\fB--help\fP/\fB--version\fP、
+および \fBPOSIXLY_CORRECT\fP 環境変数による挙動切替は実装していません。
+.PP
+オプションのように見える文字列（例: \fI-n\fP）をそのまま出力したい場合は、
+一般に \fBprintf(1)\fP を使う方が明確です。
+.SH 関連項目
+.BR printf (1),
+.BR sh (1)
