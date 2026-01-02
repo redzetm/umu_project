@@ -34,6 +34,21 @@ parse_n (const char *s)
   return n;
 }
 
+static int
+is_dash_number (const char *s)
+{
+  if (!s || s[0] != '-')
+    return 0;
+  if (s[1] == '\0')
+    return 0; /* "-" */
+  for (size_t i = 1; s[i] != '\0'; i++)
+    {
+      if (s[i] < '0' || '9' < s[i])
+        return 0;
+    }
+  return 1;
+}
+
 static void
 free_ring (char **ring, long n)
 {
@@ -144,6 +159,18 @@ main (int argc, char **argv)
         }
       nlines = n;
       argi += 2;
+    }
+  else if (argi < argc && is_dash_number (argv[argi]))
+    {
+      /* POSIX-like shorthand: "-NUM" means "-n NUM".  */
+      long n = parse_n (argv[argi] + 1);
+      if (n < 0)
+        {
+          fprintf (stderr, "umu_tail: invalid line count: %s\n", argv[argi]);
+          return 1;
+        }
+      nlines = n;
+      argi += 1;
     }
 
   int exit_status = 0;
