@@ -6,6 +6,7 @@ umu_tail \- 入力の末尾 N 行を出力する
 .SH 書式
 .B umu_tail
 .RI [ -n\ N ]
+.RI [ -N ]
 .RI [ FILE ...]
 .SH 説明
 .B umu_tail
@@ -23,6 +24,9 @@ N を省略した場合は 10 行です。
 .TP
 .BI -n\  N
 末尾 N 行を出力します（デフォルト 10）。
+.TP
+.BI -N
+\fB-n N\fP の短縮形です（例: \fB-1\fP は末尾 1 行）。
 .SH 例
 .TP
 .B umu_tail file.txt
