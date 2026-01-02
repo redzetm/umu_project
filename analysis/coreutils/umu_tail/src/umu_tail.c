@@ -1,20 +1,22 @@
 /*
- * umu_tail.c - Minimal implementation of a "tail"-like command.
+ * umu_tail.c - 「tail」風コマンドの最小実装
  *
- * Purpose (analysis/learning):
- *   Keep only the essence: print the last N lines of input.
+ * 目的（解析・学習用）:
+ *   本質だけを残すこと。
+ *   入力の末尾 N 行を出力する。
  *
- * Supported:
- *   - (no FILE) read from stdin
- *   - FILE...   process each file in order
- *   - "-"       treated as stdin
- *   - -n N      print last N lines (default: 10)
+ * 対応している機能:
+ *   - FILE を指定しない場合は標準入力から読み込む
+ *   - FILE...   指定された各ファイルを順に処理する
+ *   - "-"       標準入力として扱う
+ *   - -n N      末尾 N 行を出力する（デフォルト: 10）
  *
- * Non-goals:
- *   - No follow mode (-f).
- *   - No byte count (-c) or +N semantics.
- *   - No gnulib/coreutils dependencies.
+ * 非目標:
+ *   - 追従モードは実装しない（-f）
+ *   - バイト数指定（-c）や +N 形式の指定は実装しない
+ *   - gnulib や coreutils への依存は持たない
  */
+
 
 #define _POSIX_C_SOURCE 200809L
 
