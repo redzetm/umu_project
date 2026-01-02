@@ -1,18 +1,21 @@
 /*
- * umu_cat.c - Minimal implementation of a "cat"-like command.
+ * umu_cat.c - 「cat」風コマンドの最小実装
  *
- * Purpose (analysis/learning):
- *   Keep only the essence: copy bytes from files (or stdin) to stdout.
+ * 目的（解析・学習用）:
+ *   本質だけを残すこと。
+ *   ファイル（または標準入力）から読み込んだバイト列を
+ *   そのまま標準出力へコピーする。
  *
- * Supported:
- *   - FILE...   concatenate files
- *   - (no FILE) read from stdin
- *   - "-"       treated as stdin
+ * 対応している機能:
+ *   - FILE...   指定されたファイルを連結して出力する
+ *   - FILE を指定しない場合は標準入力から読み込む
+ *   - "-"       標準入力として扱う
  *
- * Non-goals:
- *   - No options (-n, -b, -v, ...).
- *   - No gnulib/coreutils dependencies.
+ * 非目標:
+ *   - オプションは実装しない（-n, -b, -v など）
+ *   - gnulib や coreutils への依存は持たない
  */
+
 
 #include <errno.h>
 #include <stdio.h>
