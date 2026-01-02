@@ -1,0 +1,47 @@
+.\" umu_tail(1) manual page
+.\" Date: 2026-01-02
+.TH UMU_TAIL 1 "2026-01-02" "UmuOS" "ユーザーコマンド"
+.SH 名前
+umu_tail \- 入力の末尾 N 行を出力する
+.SH 書式
+.B umu_tail
+.RI [ -n\ N ]
+.RI [ FILE ...]
+.SH 説明
+.B umu_tail
+は、入力の末尾 N 行を標準出力へ出力します。
+N を省略した場合は 10 行です。
+.PP
+引数がない場合は標準入力を読み込みます。
+ファイル名に
+.B -
+を指定した場合、その位置で標準入力を読み込みます。
+.PP
+この実装は学習・解析用途の最小版であり、一般的な\fBtail\fPが持つ
+追従表示（\fB-f\fP）やバイト数指定（\fB-c\fP）、`+N` 形式などは実装していません。
+.SH オプション
+.TP
+.BI -n\  N
+末尾 N 行を出力します（デフォルト 10）。
+.SH 例
+.TP
+.B umu_tail file.txt
+file.txt の末尾 10 行を出力します。
+.TP
+.B umu_tail -n 3 file.txt
+file.txt の末尾 3 行を出力します。
+.TP
+.B umu_tail -n 5 - file.txt
+標準入力の末尾 5 行を出力した後、file.txt の末尾 5 行を出力します。
+.SH 終了ステータス
+.TP
+0
+すべての入力を正常に処理できました。
+.TP
+1
+読み取りまたは書き込みでエラーが発生しました。
+.SH 注意
+`-f`、`-c`、`+N` 形式、`--help`/`--version` は実装していません。
+.SH 関連項目
+.BR head (1),
+.BR sed (1)
