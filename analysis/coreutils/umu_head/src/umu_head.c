@@ -1,19 +1,21 @@
 /*
- * umu_head.c - Minimal implementation of a "head"-like command.
+ * umu_head.c - 「head」風コマンドの最小実装
  *
- * Purpose (analysis/learning):
- *   Keep only the essence: print the first N lines of input.
+ * 目的（解析・学習用）:
+ *   本質だけを残すこと。
+ *   入力の先頭 N 行を出力する。
  *
- * Supported:
- *   - (no FILE) read from stdin
- *   - FILE...   process each file in order
- *   - "-"       treated as stdin
- *   - -n N      print first N lines (default: 10)
+ * 対応している機能:
+ *   - FILE を指定しない場合は標準入力から読み込む
+ *   - FILE...   指定された各ファイルを順に処理する
+ *   - "-"       標準入力として扱う
+ *   - -n N      先頭 N 行を出力する（デフォルト: 10）
  *
- * Non-goals:
- *   - No other options (-c, -q, -v, ...).
- *   - No gnulib/coreutils dependencies.
+ * 非目標:
+ *   - 他のオプションは実装しない（-c, -q, -v など）
+ *   - gnulib や coreutils への依存は持たない
  */
+
 
 #include <errno.h>
 #include <stdio.h>
