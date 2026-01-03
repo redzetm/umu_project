@@ -57,16 +57,19 @@ UmuOS 0.1.1 では、initrd は `cpio + gzip` で作られる。
 ここで大事なのは、
 initramfs の作り方（gzip にしている）と、カーネルの機能が一致している必要があるという点だ。
 
-### 2.3 `CONFIG_DEVTMPFS`：/dev が自動で生えること
+### 2.3 `CONFIG_DEVTMPFS`：/dev にデバイスノード（例：/dev/vda）が現れること
 
 initramfs `/init` は永続 root を探すために `/dev` を走査する。
 
-ところが `/dev` は普通のディレクトリではない。
-カーネルがデバイスノードを作ってくれないと、
-`/dev/vda` のようなブロックデバイスがそもそも見えない。
+ところが `/dev` は「単なるディレクトリ」ではない。
+ここに見える `/dev/vda` のようなデバイスファイル（デバイスノード）は、
+カーネルが検出したデバイス情報を元に作られてはじめて存在できる。
 
-そこで devtmpfs を mount して、カーネルに `/dev` を供給してもらう。
-それが `CONFIG_DEVTMPFS` である。
+そこで devtmpfs（カーネルがデバイスノードを供給するための仕組み）を `/dev` に mount する。
+この仕組みを有効化するのが `CONFIG_DEVTMPFS` である。
+
+補足として、カーネルが起動時に devtmpfs を自動で mount する設定が `CONFIG_DEVTMPFS_MOUNT` である。
+ただし UmuOS 0.1.1 は、観測点を固定するために `/init` 側で明示的に mount している。
 
 UmuOS 0.1.1 の `/init` は、
 `mount("devtmpfs", "/dev", "devtmpfs", ...)` を最初に行う。
