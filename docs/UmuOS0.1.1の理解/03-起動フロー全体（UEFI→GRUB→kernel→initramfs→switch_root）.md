@@ -1,4 +1,4 @@
-# 3-起動フロー全体（UEFI→GRUB→kernel→initramfs→switch_root）
+# 03-起動フロー全体（UEFI→GRUB→kernel→initramfs→switch_root）
 
 UmuOS 0.1.1 の起動は、特殊な技術の寄せ集めではない。
 Linux が提供する標準的なブートの枠組み（UEFI/GRUB/initramfs）を使い、

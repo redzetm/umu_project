@@ -1,4 +1,4 @@
-# 5-kernel側の成立条件（devtmpfs, initrd, ext4, virtio-blk）
+# 05-kernel側の成立条件（devtmpfs, initrd, ext4, virtio-blk）
 
 UmuOS 0.1.1 の起動を理解するとき、
 「initramfs の `/init` が頑張っている」ことに目が行きやすい。
@@ -7,7 +7,7 @@ UmuOS 0.1.1 の起動を理解するとき、
 その前に Linux カーネルが必要な機能を **built-in（=y）**として持っている場合に限られる。
 
 この章では、UmuOS 0.1.1 が成立するために
-カーネル側で最低限必要な条件を、初心者向けに理由から説明する。
+カーネル側で最低限必要な条件を、初学者向けに理由から説明する。
 
 ## 1. なぜ “built-in（=y）” が重要なのか
 

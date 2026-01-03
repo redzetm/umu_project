@@ -1,4 +1,4 @@
-# 7-initramfsの_init実装（init.c を教科書として読む）
+# 07-initramfsの_init実装（init.c を教科書として読む）
 
 UmuOS 0.1.1 の起動において、initramfs の `/init` は「核」と呼べる。
 理由は単純で、この `/init` が成立しない限り、永続 root（disk.img）にもユーザーランドにも到達できないからだ。
@@ -287,7 +287,7 @@ UmuOS 0.1.1 の initramfs では BusyBox が入り、
 
 ## 8. 典型的な失敗パターンの読み方（ログで切り分ける）
 
-初心者でも切り分けられるように、「ログの出方」と原因を対応づける。
+初学者でも切り分けられるように、「ログの出方」と原因を対応づける。
 
 ### 8.1 `root=UUID= not found in cmdline`
 

@@ -1,4 +1,4 @@
-# 8-switch_root後のユーザーランド（sbin-init, inittab, rcS）
+# 08-switch_root後のユーザーランド（sbin-init, inittab, rcS）
 
 前章で、initramfs の `/init` が `switch_root` を `exec` して
 永続 root（disk.img, ext4）へ責務を渡す点が UmuOS 0.1.1 の核だと確認した。
@@ -61,7 +61,7 @@ UmuOS 0.1.1 の永続 root では、`/sbin/init` は BusyBox に向けられる�
 
 - 参照：`UmuOS-0.1.1/docs/詳細設計-0.1.1.md` の 5.4〜5.5
 
-### 1.1 BusyBox init の意味（初心者向けに言い換える）
+### 1.1 BusyBox init の意味（初学者向けに言い換える）
 
 「init」とは、OS がユーザーランドへ移行した瞬間に最初に動く“司令塔”である。
 この司令塔がいないと、
@@ -165,7 +165,7 @@ rcS は次を mount する（ただし失敗しても止めない）。
 - devtmpfs（/dev）
 - devpts（/dev/pts）
 
-初心者向けに言い換えるなら、
+初学者向けに言い換えるなら、
 「ユーザーランドとして、最低限の観測と操作ができる地面を作る」ためである。
 
 initramfs `/init` でも同様の mount をしていたが、

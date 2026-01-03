@@ -1,4 +1,4 @@
-# 4-GRUB設定とカーネル引数（root=UUID, console 等）
+# 04-GRUB設定とカーネル引数（root=UUID, console 等）
 
 前章までで、UmuOS 0.1.1 の起動は
 UEFI → GRUB → Linux kernel → initramfs(`/init`) → `switch_root` → ユーザーランド
