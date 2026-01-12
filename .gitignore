@@ -48,6 +48,16 @@ UmuOS-0.1.2/initramfs/modules/
 UmuOS-0.1.2/initramfs/extracted/
 UmuOS-0.1.2/initramfs/*.img
 
+# initramfs の生成物（拡張子 .img で終わらないため、*.img では拾えない）
+step1/initramfs/initrd.img-*
+step2/initramfs/initrd.img-*
+step3/initramfs/initrd.img-*
+step4/initramfs/initrd.img-*
+UmuOSver01/initramfs/initrd.img-*
+UmuOSver011/initramfs/initrd.img-*
+UmuOS-0.1.1/initramfs/initrd.img-*
+UmuOS-0.1.2/initramfs/initrd.img-*
+
 # initramfs 生成時の中間ファイル（cpio / ファイルリスト等）
 UmuOS-0.1.*/initramfs/initrd.cpio*
 UmuOS-0.1.*/initramfs/initrd.filelist0
