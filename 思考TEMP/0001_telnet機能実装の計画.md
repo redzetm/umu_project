@@ -112,9 +112,9 @@ UmuOSのrootfsは最小で、モジュールロードを前提にしない（ini
 - [ ] （任意）ttyS1（TCPシリアル）でもログインできる（QEMUオプション依存）
 - [ ] `/logs/boot.log` が追記される
 
-ここが崩れたら Phase B 以降に進まない。
+ここが崩れたら フェーズ B 以降に進まない。
 
-## Phase B: BusyBox に telnetd が含まれているか確認
+## フェーズ B: BusyBox に telnetd が含まれているか確認
 
 目的：不足機能（busybox applet）が原因でハマるのを避ける。
 
@@ -128,7 +128,7 @@ UmuOSのrootfsは最小で、モジュールロードを前提にしない（ini
 1) busybox-static の別ビルド（CONFIG_TELNETD/CONFIG_LOGINを有効）を用意して ext4 へ入れる
 2) いったん telnetd を諦め、`nc` 等の別経路でネット疎通だけを先に確立（telnetdは次段）
 
-## Phase C: virt-manager のNICをブリッジ接続にする
+## フェーズ C: virt-manager のNICをブリッジ接続にする
 
 目的：ローカルPC（MiniPC） → ゲスト（UmuOS）への到達経路を作る。
 
@@ -141,7 +141,7 @@ UmuOSのrootfsは最小で、モジュールロードを前提にしない（ini
 - ホスト（RockyLinux 9.7 の仮想マシンマネージャ）でブリッジが存在し、物理NICが参加していること
 - ゲスト（UmuOS）側で `eth0` が見えて Link が上がること
 
-## Phase D: ゲストのネットワーク初期化（ext4 rcS を拡張）
+## フェーズ D: ゲストのネットワーク初期化（ext4 rcS を拡張）
 
 目的：telnetdより先に「IPが付く」「デフォルトルートが入る」を確定する。
 
@@ -180,7 +180,7 @@ ext4 側に `/etc/umu/network.conf` を追加し、rcSが読む。
 - [ ] `ip addr show dev eth0` に `192.168.0.202/24` が出る
 - [ ] `ip route` に `default via 192.168.0.1 dev eth0` が出る
 
-## Phase E: BusyBox telnetd 起動（最小）
+## フェーズ E: BusyBox telnetd 起動（最小）
 
 目的：ネットワーク確定後に telnetd を有効化し、切り分けを明確にする。
 
@@ -213,7 +213,7 @@ ext4 側に `/etc/umu/network.conf` を追加し、rcSが読む。
 - [ ] `ps | grep telnetd`（または `netstat -tnlp` 相当があれば確認）
 - [ ] `/logs/boot.log` に `[telnetd] started` 等の杭が残る
 
-## Phase F: トラブルシュート用の固定手順（計画に埋め込む）
+## フェーズ F: トラブルシュート用の固定手順（計画に埋め込む）
 
 telnetが失敗したとき、0.1.1の失敗（混線）を避けるため **順序を固定**する。
 
