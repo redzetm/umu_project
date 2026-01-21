@@ -106,11 +106,23 @@ UmuOSのrootfsは最小で、モジュールロードを前提にしない（ini
 
 目的：telnetd導入前に「戻れる状態」を確定する。
 
-- [ ] `UmuOS-0.1.3-boot.iso` + `disk/disk.img` で起動できる
-- [ ] `switch_root` が成立する（ttyS0ログに明確な杭が出る）
-- [ ] ttyS0 で `root` / `tama` がパスワードログインできる
-- [ ] （任意）ttyS1（TCPシリアル）でもログインできる（QEMUオプション依存）
-- [ ] `/logs/boot.log` が追記される
+### 観測結果（2026-01-22 / virt-manager）
+
+フェーズAの「成立」を、virt-manager 上で次の通り観測できた。
+
+- [x] ① UmuOS0.1.3 の設計で virt-manager 起動ができた
+- [x] ② BusyBox（各種コマンド類）が動作している
+- [x] ③ 開発環境と同じ動作（起動・ログイン・コマンド実行）が確認できた
+- [x] ④ virt-manager では「コンソール」ではなく「シリアル1」で表示しないと観測できない
+- [x] ⑤ virt-manager で起動して、起動させたままにできる（起動状態を維持できる）
+- [x] ⑥ virt-manager の操作ではシャットダウン／再起動ができない（シリアル側からのコマンドのみ受け付ける）
+- [x] ⑦ 一度起動を止めると、以後再起動しない（`No bootable device` になる）※要調査
+
+- [x] `UmuOS-0.1.3-boot.iso` + `disk/disk.img` で起動できる
+- [x] `switch_root` が成立する（ttyS0ログに明確な杭が出る）
+- [x] ttyS0 で `root` / `tama` がパスワードログインできる
+- [x] （任意）ttyS1（TCPシリアル）でもログインできる（QEMUオプション依存）
+- [x] `/logs/boot.log` が追記される
 
 ここが崩れたら フェーズ B 以降に進まない。
 
