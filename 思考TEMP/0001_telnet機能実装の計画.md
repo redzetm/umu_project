@@ -9,6 +9,13 @@ base: UmuOS-0.1.3
 - telnetdを導入して、今後はユーザーランド開発に向けていくので、ベースOSとする
 - 0.1.5以降は、0.1.4をベースに機能を追加していく
 
+注記（A案、固定）：
+
+- 本ドキュメントは「計画（段取りと意思決定の履歴）」であり、細部は後続の設計で更新され得る。
+- 実装・詳細設計で参照する正（source of truth）は基本設計書とする。
+  - `UmuOS-0.1.4 Base Stable/docs/UmuOS-0.1.4 Base Stable-基本設計書.md`
+- ただし、事故防止のため「固定値（バージョン/パス/成果物名/I/F）」は基本設計と矛盾しないよう計画側も追随する。
+
 
 # 要件定義（確定）
 
@@ -35,7 +42,7 @@ base: UmuOS-0.1.3
 
 ソースバージョン固定（UmuOS-0.1.4 Base Stable）：
 
-- Linux kernel：`6.6.18`（ソース基準：`external/linux-6.6.18-kernel/`）
+- Linux kernel：`6.18.1`（ソース基準：`external/linux-6.18.1-kernel/`）
 - BusyBox：`1.36.1`
 	- 0.1.4 は BusyBox の `telnetd` / `login` / `nc` / `ip` を使用する（`iproute2` は前提にしない）
 
@@ -84,16 +91,16 @@ UmuOS-0.1.4 Base Stable を「最初から再現できる」形で構築し（�
 
 成果物の配置（固定）：
 
-- `UmuOS-0.1.4/` を新規に作り、ビルド〜起動までをこの配下で完結させる
+- `UmuOS-0.1.4 Base Stable/` を新規に作り、ビルド〜起動までをこの配下で完結させる
 - 既存の `UmuOS-0.1.3/` を含む 0.1.x ディレクトリは参照のみ（変更しない）
 
-`UmuOS-0.1.4/` 配下の成果物（固定）：
+`UmuOS-0.1.4 Base Stable/` 配下の成果物（固定）：
 
-- `kernel/`：Linux 6.6.18 のビルド用ツリー（`.config` とビルド手順を固定し、ビルド成果物をここに置く）
+- `kernel/`：Linux 6.18.1 のビルド用ツリー（`.config` とビルド手順を固定し、ビルド成果物をここに置く）
 - `initramfs/`：initramfs 生成に必要なソース・rootfs・生成物（`initrd.cpio` 等）
 - `disk/`：永続 ext4 ディスク（`disk.img`）
 - `iso_root/`：ISO 生成素材（GRUB設定含む）
-- `run/`：起動用の固定引数メモ（後で起動スクリプト化する前提の I/F 定義）
+- `run/`：起動 I/F 定義（固定引数は `run/qemu.cmdline.txt` を正とする）
 - `logs/`：ホスト側ログ（QEMUコンソール等）と、ゲスト側ログ（/logs/boot.log）の観測メモ
 - `docs/`：0.1.4 固有の設計・再現手順（基本設計書/詳細設計書をここから作る）
 
@@ -238,9 +245,8 @@ ip link del dev tap-umu || true
 
 起動スクリプト化（必須：手順固定と後片付け自動化）：
 
-- Rocky（ホスト）側で「tap 作成 → QEMU 起動 → 終了時に tap 削除」を 1 本の起動スクリプトにまとめる。
-- QEMU が異常終了しても tap が残らないよう、`trap`（`EXIT`）でクリーンアップを必ず実行する。
-- スクリプトは詳細設計書で I/F（引数：`disk.img`/`boot.iso`、環境変数：`TAP_DEV`/`BR_DEV` 等）を固定してから実装する。
+- 起動I/Fは「定義ファイル方式」とし、QEMU 引数の完成形は `run/qemu.cmdline.txt` を正とする。
+- 実行ラッパ（`script` でログ採取しつつ起動するためのスクリプト等）を作るかどうかは詳細設計で決める。
 
 常時稼働の運用：
 
@@ -258,9 +264,11 @@ MODE=static
 IP=192.168.0.202/24
 GW=192.168.0.1
 DNS=192.168.0.1
-TELNETD_ENABLE=1
-NC_RECV_ENABLE=0
+ 
 ```
+
+注記（固定）：本計画にあった feature flag（`TELNETD_ENABLE`/`NC_RECV_ENABLE`）は採用しない。
+（基本設計の外部I/Fは `/etc/umu/network.conf` のネットワーク設定キーに限定する）
 
 rcS 変更方針：
 
