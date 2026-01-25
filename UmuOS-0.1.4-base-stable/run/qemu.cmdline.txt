@@ -1,0 +1,12 @@
+/usr/libexec/qemu-kvm \
+	-enable-kvm -cpu host -m 1024 \
+	-machine q35,accel=kvm \
+	-nographic \
+	-serial stdio \
+	-serial tcp:127.0.0.1:5555,server,nowait,telnet \
+	-drive file=./disk/disk.img,format=raw,if=virtio \
+	-cdrom ./UmuOS-0.1.4-boot.iso \
+	-boot order=d \
+	-netdev tap,id=net0,ifname=tap-umu,script=no,downscript=no \
+	-device virtio-net-pci,netdev=net0 \
+	-monitor none
