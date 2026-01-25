@@ -213,7 +213,6 @@ make menuconfig
 - `CONFIG_INIT=y`
 - `CONFIG_FEATURE_USE_INITTAB=y`
 - `CONFIG_GETTY=y`
-- `CONFIG_FEATURE_USE_INITTAB=y`
 - `CONFIG_SWITCH_ROOT=y`
 - `CONFIG_TELNETD=y`
 - `CONFIG_FEATURE_TELNETD_STANDALONE=y`
@@ -664,11 +663,17 @@ chmod 600 disk/disk.img
 ```bash
 cd /root/UmuOS-0.1.4-base-stable
 
+# 起動モード（ホスト側）
+# - 既定（Rocky想定）: --net tap（br0 + tap-umu を使う）
+# - 切り分け（Ubuntu等）: --net none（ネット無しで起動だけ行う）
+# 使い方は ./umuOSstart.sh --help
+
 # 起動（必要なら tap-umu を作って br0 に接続してから起動する。ttyS0 のログは logs/ に保存される）
 ./umuOSstart.sh
 
-# NOTE: br0/tap を用意できない環境では、起動だけなら NET_MODE=none でよい（ネットワーク機能は使えない）。
-# NET_MODE=none ./umuOSstart.sh
+# NOTE: br0/tap を用意できない環境では、起動だけならネット無しでよい（ネットワーク機能は使えない）。
+# ./umuOSstart.sh --net none
+# （同等）NET_MODE=none ./umuOSstart.sh
 ```
 
 停止後：

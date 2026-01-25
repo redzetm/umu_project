@@ -12,6 +12,21 @@ TAP_IF="${TAP_IF:-tap-umu}"
 BRIDGE="${BRIDGE:-br0}"
 NET_MODE="${NET_MODE:-tap}"
 
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [--net tap|none]
+
+Options:
+  --net, --net-mode <tap|none>  Network mode (default: tap)
+  -h, --help                   Show this help
+
+Examples:
+  sudo ./$((basename "$0"))                # Rocky: bridged tap (default)
+  ./$((basename "$0")) --net none          # Boot without networking (e.g. Ubuntu without br0)
+  NET_MODE=none ./$((basename "$0"))       # Same as above (env var form)
+EOF
+}
+
 say() { echo "[umuOSstart] $*"; }
 die() { echo "[umuOSstart] ERROR: $*" >&2; exit 1; }
 
@@ -42,6 +57,31 @@ need_file "${DISK}"
 
 mkdir -p "${LOG_DIR}" "${RUN_DIR}"
 
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --net|--net-mode)
+      [[ $# -ge 2 ]] || die "missing value for $1 (expected: tap|none)"
+      NET_MODE="$2"
+      shift 2
+      ;;
+    --net=*|--net-mode=*)
+      NET_MODE="${1#*=}"
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      die "unknown argument: $1 (use --help)"
+      ;;
+  esac
+done
+
 QEMU_BIN="$(find_qemu)" || die "qemu binary not found (/usr/libexec/qemu-kvm or qemu-kvm or qemu-system-x86_64)"
 
 if command -v ss >/dev/null 2>&1; then
@@ -52,7 +92,7 @@ fi
 
 if [[ "${NET_MODE}" == "tap" ]]; then
   if ! ip link show "${BRIDGE}" >/dev/null 2>&1; then
-    die "bridge '${BRIDGE}' not found. Create it (br0) or set BRIDGE=... (or set NET_MODE=none to boot without networking)"
+    die "bridge '${BRIDGE}' not found. Create it (br0) or set BRIDGE=... (or use --net none / NET_MODE=none to boot without networking)"
   fi
 
   if ! ip link show "${TAP_IF}" >/dev/null 2>&1; then

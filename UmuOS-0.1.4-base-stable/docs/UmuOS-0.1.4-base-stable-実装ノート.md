@@ -19,9 +19,17 @@ status: ongoing
 ## 1.2 必ず残すログ
 可能な範囲で以下を保存・参照する。
 
-- ホスト（Rocky）: `logs/host_qemu.console.log`（`script` で採取）
+- ホスト（Rocky）: `logs/host_qemu.console_YYYYMMDD_HHMMSS.log`（`umuOSstart.sh` が `script` で採取）
 - ゲスト（UmuOS）: `/logs/boot.log`
 - 追加: `run/qemu.cmdline.txt` の実際に実行した内容
+
+## 1.4 現時点の最適解（2026-01-25）
+
+- 優先ターゲット：RockyLinux 9.7（受入）を優先し、Ubuntu 24.04 はビルドと切り分け用途。
+- 起動I/F：`umuOSstart.sh` を1本化し、ホスト側ネットワークは `--net` で切り替える。
+  - `./umuOSstart.sh`（既定 `--net tap`：br0 + tap-umu 前提。Rockyの受入はこちら）
+  - `./umuOSstart.sh --net none`（ネット無しで起動だけ。Ubuntu等で br0 が無い場合の切り分け）
+- ログ：ttyS0 はホスト側 `logs/host_qemu.console_*.log` に保存し、ttyS1 は `connect_ttyS1.sh` で別ログに分ける。
 
 ## 1.3 変更の粒度
 - 1回の試行で触るのは「1〜2点まで」。
@@ -92,12 +100,33 @@ status: ongoing
 	- `make -j"$(nproc)"`
 	- `file busybox`
 - Rocky:
-  - 
+  - （以降は受入。Rocky の root で実行）
+  - `dnf -y install qemu-kvm qemu-img tmux util-linux iproute`
+  - `test -x /usr/libexec/qemu-kvm`
+  - `ls -l /dev/kvm /dev/net/tun`
+  - `ip link show br0`
+  - `cd /root/UmuOS-0.1.4-base-stable`
+  - `chmod +x umuOSstart.sh connect_ttyS1.sh run/tap_up.sh run/tap_down.sh`
+  - `./run/tap_up.sh tap-umu`
+  - `./umuOSstart.sh`
+  - （別ターミナル）`cd /root/UmuOS-0.1.4-base-stable && ./connect_ttyS1.sh 5555`
+  - UmuOS（ttyS0/ttyS1 でログイン後、観測）:
+    - `tail -n 80 /logs/boot.log`
+    - `ip addr show dev eth0 || true`
+    - `ip route || true`
+    - `ps | grep -E 'telnetd|inetd' || true`
+  - telnet（LAN側から疎通確認）:
+    - `telnet 192.168.0.202`（接続できればOK。rootのみ失敗なら `/etc/securetty` を疑う）
+  - nc 転送（疎通確認）:
+    - UmuOS: `mkdir -p /tmp/in && cd /tmp/in && nc -l -p 12345 > payload.bin`
+    - Ubuntu: `nc 192.168.0.202 12345 < payload.bin`
+  - 停止後（必要ならクリーンアップ）:
+    - `./run/tap_down.sh tap-umu`
 
 ### 観測（ログ/画面で見えた事実）
 - ttyS0:
   - 
-- host（Rocky）`logs/host_qemu.console.log`:
+- host（Rocky）`logs/host_qemu.console_*.log`:
   - 
 - ゲスト `/logs/boot.log`:
   - 
