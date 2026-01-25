@@ -17,6 +17,9 @@ status: draft
 - Ubuntu / Rocky ともに恒久的なネットワーク設定変更は行わない。
 	- Rocky 側で許容するネットワーク操作は **一時的な tap-umu の作成/削除のみ**（br0 は観測のみ）。
 
+補足：本ファイル先頭の front matter（例：`status: draft`）は文書管理用のメタ情報であり、
+OSのビルド/起動/受入の成否には影響しない。レビュー中は `draft` のままでよい。
+
 # 2. 参照
 
 - 基本設計書：`UmuOS-0.1.4 Base Stable/docs/UmuOS-0.1.4 Base Stable-基本設計書.md`
@@ -550,10 +553,27 @@ echo "# パスワードハッシュを2回生成（root / tama）"
 openssl passwd -6
 openssl passwd -6
 
-sudo tee /mnt/umuos014/etc/shadow >/dev/null <<'EOF'
-root:$6$REPLACE_WITH_HASH_FOR_ROOT:20000:0:99999:7:::
-tama:$6$REPLACE_WITH_HASH_FOR_TAMA:20000:0:99999:7:::
-EOF
+ここは **いつも通り手動で** ハッシュを生成し、生成した値をその場で `/etc/shadow` に反映する。
+
+```bash
+# root 用ハッシュ（対話入力）
+HASH_ROOT="$(openssl passwd -6)"
+
+# tama 用ハッシュ（対話入力）
+HASH_TAMA="$(openssl passwd -6)"
+
+# 生成結果を目視確認（漏えいに注意。ログに残さない運用が望ましい）
+echo "HASH_ROOT=${HASH_ROOT}"
+echo "HASH_TAMA=${HASH_TAMA}"
+
+# /etc/shadow を生成（ハッシュ内の '$' を壊さないため、変数展開で埋め込む）
+sudo sh -c '
+	printf "%s\n" \
+		"root:${HASH_ROOT}:20000:0:99999:7:::" \
+		"tama:${HASH_TAMA}:20000:0:99999:7:::" \
+		> /mnt/umuos014/etc/shadow
+'
+```
 
 sudo chown root:root /mnt/umuos014/etc/shadow
 sudo chmod 600 /mnt/umuos014/etc/shadow
@@ -616,12 +636,15 @@ grub-mkrescue -o UmuOS-0.1.4-boot.iso iso_root
 
 方針：起動コマンドはスクリプトに埋めず、`run/qemu.cmdline.txt` を **正** として固定する。
 
+注記（固定）：RockyLinux 9.7 では `qemu-system-x86_64` が `/usr/bin` に提供されない場合があるため、
+本手順では Rocky 側での起動コマンド実体を `/usr/libexec/qemu-kvm` に固定する。
+
 ```bash
 cd ~/umu/umu_project/UmuOS-0.1.4\ Base\ Stable
 mkdir -p run
 
 cat > run/qemu.cmdline.txt <<'EOF'
-qemu-system-x86_64 \
+/usr/libexec/qemu-kvm \
 	-enable-kvm -cpu host -m 1024 \
 	-machine q35,accel=kvm \
 	-nographic \
@@ -657,19 +680,43 @@ dnf -y install \
 	tmux \
 	util-linux iproute bridge-utils
 
-command -v qemu-system-x86_64
+test -x /usr/libexec/qemu-kvm
 command -v script
 command -v tmux
 ```
+
+補足：`tmux` は「常時稼働を tmux 内で行う」という基本設計の前提に直結するため、本手順の必須パッケージとして導入する（恒久変更だが許容範囲）。
 
 ### 13.1.2 KVM 利用可否（観測点）
 
 ```bash
 ls -l /dev/kvm
-lsmod | grep -E '^(kvm|kvm_intel|kvm_amd)\b' || true
+lsmod | grep -E '^(kvm|kvm_intel|kvm_amd)( |$)' || true
+
+ls -l /dev/net/tun
 ```
 
 `/dev/kvm` が無い場合は、基本設計（KVM必須）により中止する。
+
+## 13.1.3 QEMU コマンド確認（観測点）
+
+`run/qemu.cmdline.txt` は RockyLinux 9.7 上で `/usr/libexec/qemu-kvm` を呼び出す前提で固定する。
+（`qemu-system-x86_64` は bash-completion のみがヒットする等、期待どおりに提供されないことがある。）
+
+```bash
+test -x /usr/libexec/qemu-kvm || true
+
+# まだ無い場合は導入する
+dnf -y install qemu-kvm qemu-img
+
+test -x /usr/libexec/qemu-kvm
+/usr/libexec/qemu-kvm --version
+
+# 導入済みパッケージ確認（観測点）
+rpm -q qemu-kvm qemu-img || true
+```
+
+補足：`lsmod | grep -E '...\b'` のように `\\b` を書くと、正規表現の単語境界ではなく「\b という文字列」を探してしまい、誤って未検出になることがある。本書ではその罠を避けるため `( |$)` を用いる。
 
 ## 13.2 配置（Ubuntu→Rocky へ成果物転送も含む）
 
@@ -733,6 +780,130 @@ ip addr show dev br0
 
 基本設計の制約により、`br0` を新規作成する手順（恒久NW変更）は本書には含めない。
 
+### 13.3.1 RockyLinux 9.7 のネットワーク実測値（tama@hsv）
+
+以下は本環境の **実測値**（`ip a` 出力）であり、以降の受入手順はこの状態を前提とする。
+
+- `br0` が `192.168.0.200/24` を持つ
+- 物理NIC `enp0s25` が `br0` の slave（`master br0`）になっている
+- `virbr0`（libvirt のデフォルトNATブリッジ）は存在してもよいが、本手順では使用しない
+- `vnet0`（libvirt 管理の TAP）は存在してもよいが、本手順では使用しない（UmuOS は `tap-umu` を都度作成して使う）
+
+```text
+[tama@hsv ~]$ ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+	link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+	inet 127.0.0.1/8 scope host lo
+	   valid_lft forever preferred_lft forever
+	inet6 ::1/128 scope host
+	   valid_lft forever preferred_lft forever
+2: enp0s25: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel master br0 state UP group default qlen 1000
+	link/ether 90:1b:0e:19:f1:27 brd ff:ff:ff:ff:ff:ff
+3: enp2s0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc fq_codel state DOWN group default qlen 1000
+	link/ether 90:1b:0e:0d:61:c7 brd ff:ff:ff:ff:ff:ff
+4: br0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+	link/ether 90:1b:0e:19:f1:27 brd ff:ff:ff:ff:ff:ff
+	inet 192.168.0.200/24 brd 192.168.0.255 scope global noprefixroute br0
+	   valid_lft forever preferred_lft forever
+	inet6 fe80::f823:4e50:bb42:866a/64 scope link noprefixroute
+	   valid_lft forever preferred_lft forever
+5: virbr0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default qlen 1000
+	link/ether 52:54:00:f6:6d:d2 brd ff:ff:ff:ff:ff:ff
+	inet 192.168.122.1/24 brd 192.168.122.255 scope global virbr0
+	   valid_lft forever preferred_lft forever
+6: vnet0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master br0 state UNKNOWN group default qlen 1000
+	link/ether fe:54:00:8e:0a:cd brd ff:ff:ff:ff:ff:ff
+	inet6 fe80::fc54:ff:fe8e:acd/64 scope link
+	   valid_lft forever preferred_lft forever
+```
+
+### 13.3.2 RockyLinux 9.7 の追加実測値（tama@hsv）
+
+以下も本環境の **実測値**である（設定変更はしていない。`tmux` のみパッケージ導入を実施）。
+
+```text
+[root@hsv tama]# ls -l /dev/kvm
+crw-rw-rw- 1 root kvm 10, 232  1月 22 05:45 /dev/kvm
+
+[root@hsv tama]# ls -l /dev/net/tun
+crw-rw-rw- 1 root root 10, 200  1月 19 06:19 /dev/net/tun
+
+[root@hsv tama]# lsmod | grep -E '^(kvm|kvm_intel|kvm_amd)( |$)' || true
+kvm_intel             536576  6
+kvm                  1417216  5 kvm_intel
+
+[root@hsv tama]# systemctl is-active firewalld || true
+active
+
+[root@hsv tama]# nft list ruleset | head
+table inet firewalld { # progname firewalld
+	flags owner,persist
+
+	ct helper helper-tftp-udp {
+		type "tftp" protocol udp
+		l3proto inet
+	}
+
+	chain mangle_PREROUTING {
+		type filter hook prerouting priority mangle + 10; policy accept;
+
+[root@hsv tama]# lsmod | grep br_netfilter || true
+
+[root@hsv tama]# sysctl net.bridge.bridge-nf-call-iptables net.bridge.bridge-nf-call-ip6tables net.bridge.bridge-nf-call-arptables || true
+sysctl: cannot stat /proc/sys/net/bridge/bridge-nf-call-iptables: そのようなファイルやディレクトリはありません
+sysctl: cannot stat /proc/sys/net/bridge/bridge-nf-call-ip6tables: そのようなファイルやディレクトリはありません
+sysctl: cannot stat /proc/sys/net/bridge/bridge-nf-call-arptables: そのようなファイルやディレクトリはありません
+
+[root@hsv tama]# systemctl is-active libvirtd || true
+inactive
+
+[root@hsv tama]# getenforce
+Disabled
+
+[root@hsv tama]# firewall-cmd --state
+running
+
+[root@hsv tama]# firewall-cmd --get-active-zones
+libvirt
+	interfaces: virbr0
+public
+	interfaces: br0 enp0s25
+
+[root@hsv tama]# bridge link show
+2: enp0s25: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 master br0 state forwarding priority 32 cost 100
+6: vnet0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 master br0 state forwarding priority 32 cost 100
+
+[root@hsv tama]# ip link show vnet0
+6: vnet0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master br0 state UNKNOWN mode DEFAULT group default qlen 1000
+	link/ether fe:54:00:8e:0a:cd brd ff:ff:ff:ff:ff:ff
+
+[root@hsv tama]# ethtool enp0s25 | grep -E 'Link detected' || true
+	Link detected: yes
+
+[root@hsv tama]# dnf -y install tmux
+(略) tmux-3.2a-5.el9.x86_64 installed
+
+[root@hsv tama]# qemu-system-x86_64 --version
+bash: qemu-system-x86_64: コマンドが見つかりませんでした...
+
+[root@hsv tama]# dnf -y install qemu-kvm qemu-img
+パッケージ qemu-kvm-17:9.1.0-29.el9_7.3.x86_64 は既にインストールされています。
+パッケージ qemu-img-17:9.1.0-29.el9_7.3.x86_64 は既にインストールされています。
+
+[root@hsv tama]# rpm -q qemu-kvm qemu-img
+qemu-kvm-9.1.0-29.el9_7.3.x86_64
+qemu-img-9.1.0-29.el9_7.3.x86_64
+
+[root@hsv tama]# ls -l /usr/libexec/qemu-kvm
+-rwxr-xr-x. 1 root root 29593888 12月 19 05:37 /usr/libexec/qemu-kvm
+
+[root@hsv tama]# /usr/libexec/qemu-kvm --version
+QEMU emulator version 9.1.0 (qemu-kvm-9.1.0-29.el9_7.3)
+
+# 補足：本環境では qemu-kvm の実体は /usr/libexec/qemu-kvm であり、qemu-system-x86_64 / qemu-kvm が PATH 上に存在しない。
+# そのため run/qemu.cmdline.txt は /usr/libexec/qemu-kvm を呼び出す前提で固定する。
+```
+
 ## 13.4 起動（tap-umu を都度作成→終了時に削除）
 
 1回の起動で実行する操作（固定）：
@@ -741,6 +912,9 @@ ip addr show dev br0
 
 ```bash
 cd "/home/tama/UmuOS-0.1.4 Base Stable"
+
+# QEMU コマンドが存在すること（起動前の最重要チェック）
+test -x /usr/libexec/qemu-kvm
 
 # 起動前クリーンアップ
 ip link set dev tap-umu down || true
@@ -764,6 +938,14 @@ fi
 
 script -q -f -c "$(cat run/qemu.cmdline.txt)" logs/host_qemu.console.log
 ```
+
+KVM が使えているかの判定（固定、観測点）：
+
+```bash
+grep -iE 'failed to initialize kvm|kvm' logs/host_qemu.console.log | head -n 50 || true
+```
+
+`failed to initialize KVM` 等が出る場合は、KVM 前提が崩れているため中止して切り分ける。
 
 ## 13.5 停止後クリーンアップ（必須）
 
