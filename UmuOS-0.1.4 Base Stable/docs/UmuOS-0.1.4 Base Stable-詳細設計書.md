@@ -180,15 +180,12 @@ fi
 ```bash
 cd ~/umu/umu_project/UmuOS-0.1.4\ Base\ Stable
 
-KERNEL_SRC=~/umu/umu_project/external/linux-6.18.1-kernel
-KERNEL_OUT=$PWD/kernel/build
+mkdir -p kernel/build
 
-mkdir -p "$KERNEL_OUT"
+make -C ~/umu/umu_project/external/linux-6.18.1-kernel O=kernel/build mrproper
+make -C ~/umu/umu_project/external/linux-6.18.1-kernel O=kernel/build defconfig
 
-make -C "$KERNEL_SRC" O="$KERNEL_OUT" mrproper
-make -C "$KERNEL_SRC" O="$KERNEL_OUT" defconfig
-
-"$KERNEL_SRC"/scripts/config --file "$KERNEL_OUT"/.config \
+~/umu/umu_project/external/linux-6.18.1-kernel/scripts/config --file kernel/build/.config \
 	-e DEVTMPFS \
 	-e DEVTMPFS_MOUNT \
 	-e TMPFS \
@@ -207,9 +204,9 @@ make -C "$KERNEL_SRC" O="$KERNEL_OUT" defconfig
 	-d IPV6 \
 	-d IP_PNP
 
-make -C "$KERNEL_SRC" O="$KERNEL_OUT" olddefconfig
+make -C ~/umu/umu_project/external/linux-6.18.1-kernel O=kernel/build olddefconfig
 
-cp -f "$KERNEL_OUT"/.config kernel/config-6.18.1
+cp -f kernel/build/.config kernel/config-6.18.1
 ```
 
 観測点（期待値が `=y` / `is not set` になっていること）：
@@ -222,7 +219,7 @@ grep -E '^(# CONFIG_IPV6 is not set|# CONFIG_IP_PNP is not set)$' kernel/config-
 ## 7.3 ビルド
 
 ```bash
-make -C "$KERNEL_SRC" O="$KERNEL_OUT" -j"$(nproc)"
+make -C ~/umu/umu_project/external/linux-6.18.1-kernel O=kernel/build -j"$(nproc)"
 ```
 
 ## 7.4 ISO入力へ配置
@@ -267,14 +264,11 @@ external は参照のみのため、作業用コピーを作る。
 ```bash
 cd ~/umu/umu_project/UmuOS-0.1.4\ Base\ Stable
 
-BUSYBOX_SRC=~/umu/umu_project/external/busybox-1.36.1
-BUSYBOX_WORK=$PWD/initramfs/busybox/work
+rm -rf initramfs/busybox/work
+mkdir -p initramfs/busybox/work
+rsync -a --delete ~/umu/umu_project/external/busybox-1.36.1/ initramfs/busybox/work/
 
-rm -rf "$BUSYBOX_WORK"
-mkdir -p "$BUSYBOX_WORK"
-rsync -a --delete "$BUSYBOX_SRC"/ "$BUSYBOX_WORK"/
-
-cd "$BUSYBOX_WORK"
+cd initramfs/busybox/work
 make distclean
 make defconfig
 ```
@@ -282,37 +276,28 @@ make defconfig
 `.config` を編集して必須項目を反映（この時点で `initramfs/busybox/config-1.36.1` として保存する）：
 
 ```bash
-cd "$BUSYBOX_WORK"
+cd ~/umu/umu_project/UmuOS-0.1.4\ Base\ Stable/initramfs/busybox/work
 
 # 既存行があれば置換、無ければ追記（単純だが再現性優先）
-set_kv() {
-	key="$1"; val="$2"
-	if grep -q "^${key}=" .config; then
-		sed -i "s/^${key}=.*/${key}=${val}/" .config
-	else
-		echo "${key}=${val}" >> .config
-	fi
-}
-
-set_kv CONFIG_STATIC y
-set_kv CONFIG_TELNETD y
-set_kv CONFIG_LOGIN y
-set_kv CONFIG_FEATURE_SECURETTY y
-set_kv CONFIG_FEATURE_SHADOWPASSWDS y
-set_kv CONFIG_NC y
-set_kv CONFIG_IP y
+grep -q '^CONFIG_STATIC=' .config && sed -i 's/^CONFIG_STATIC=.*/CONFIG_STATIC=y/' .config || echo 'CONFIG_STATIC=y' >> .config
+grep -q '^CONFIG_TELNETD=' .config && sed -i 's/^CONFIG_TELNETD=.*/CONFIG_TELNETD=y/' .config || echo 'CONFIG_TELNETD=y' >> .config
+grep -q '^CONFIG_LOGIN=' .config && sed -i 's/^CONFIG_LOGIN=.*/CONFIG_LOGIN=y/' .config || echo 'CONFIG_LOGIN=y' >> .config
+grep -q '^CONFIG_FEATURE_SECURETTY=' .config && sed -i 's/^CONFIG_FEATURE_SECURETTY=.*/CONFIG_FEATURE_SECURETTY=y/' .config || echo 'CONFIG_FEATURE_SECURETTY=y' >> .config
+grep -q '^CONFIG_FEATURE_SHADOWPASSWDS=' .config && sed -i 's/^CONFIG_FEATURE_SHADOWPASSWDS=.*/CONFIG_FEATURE_SHADOWPASSWDS=y/' .config || echo 'CONFIG_FEATURE_SHADOWPASSWDS=y' >> .config
+grep -q '^CONFIG_NC=' .config && sed -i 's/^CONFIG_NC=.*/CONFIG_NC=y/' .config || echo 'CONFIG_NC=y' >> .config
+grep -q '^CONFIG_IP=' .config && sed -i 's/^CONFIG_IP=.*/CONFIG_IP=y/' .config || echo 'CONFIG_IP=y' >> .config
 
 make olddefconfig
 
 cd ~/umu/umu_project/UmuOS-0.1.4\ Base\ Stable
 mkdir -p initramfs/busybox
-cp -f "$BUSYBOX_WORK"/.config initramfs/busybox/config-1.36.1
+cp -f initramfs/busybox/work/.config initramfs/busybox/config-1.36.1
 ```
 
 ビルド（静的リンク）：
 
 ```bash
-cd "$BUSYBOX_WORK"
+cd ~/umu/umu_project/UmuOS-0.1.4\ Base\ Stable/initramfs/busybox/work
 make -j"$(nproc)"
 file busybox
 ```
@@ -553,26 +538,19 @@ echo "# パスワードハッシュを2回生成（root / tama）"
 openssl passwd -6
 openssl passwd -6
 
-ここは **いつも通り手動で** ハッシュを生成し、生成した値をその場で `/etc/shadow` に反映する。
+ここは **いつも通り手動で** ハッシュを生成し、生成した値を `/etc/shadow` に貼り付けて反映する。
+
+手順（固定）：
+
+1. `openssl passwd -6` を2回実行し、それぞれの出力（`$6$...` で始まる文字列）を控える（root 用 / tama 用）。
+2. 以下の `tee` を実行し、`<ここに...>` の部分を **手元のハッシュに置き換えて** 実行する。
+   - `<<'EOF'` の **シングルクォート付き** heredoc を使うことで、`$6$...` の `$` がシェル展開されない。
 
 ```bash
-# root 用ハッシュ（対話入力）
-HASH_ROOT="$(openssl passwd -6)"
-
-# tama 用ハッシュ（対話入力）
-HASH_TAMA="$(openssl passwd -6)"
-
-# 生成結果を目視確認（漏えいに注意。ログに残さない運用が望ましい）
-echo "HASH_ROOT=${HASH_ROOT}"
-echo "HASH_TAMA=${HASH_TAMA}"
-
-# /etc/shadow を生成（ハッシュ内の '$' を壊さないため、変数展開で埋め込む）
-sudo sh -c '
-	printf "%s\n" \
-		"root:${HASH_ROOT}:20000:0:99999:7:::" \
-		"tama:${HASH_TAMA}:20000:0:99999:7:::" \
-		> /mnt/umuos014/etc/shadow
-'
+sudo tee /mnt/umuos014/etc/shadow >/dev/null <<'EOF'
+root:<ここにroot用のopenssl出力（$6$...）を貼る>:20000:0:99999:7:::
+tama:<ここにtama用のopenssl出力（$6$...）を貼る>:20000:0:99999:7:::
+EOF
 ```
 
 sudo chown root:root /mnt/umuos014/etc/shadow
