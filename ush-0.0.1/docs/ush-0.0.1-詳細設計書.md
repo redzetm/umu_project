@@ -42,7 +42,34 @@ ush/
 
 ---
 
-# 3. 定数・制限値（`ush_limits.h`）
+# 3. ビルド手順（開発ホスト）
+本MVPは「開発ホストで musl により静的リンクビルドし、単一バイナリを UmuOS に持ち込む」方針とする。
+
+## 3.1 前提
+- 開発ホストに `musl-gcc` が存在すること
+- 生成物は静的リンク単一バイナリ `ush` とする（動的リンクへのフォールバックは行わない）
+
+## 3.2 ビルドコマンド（例）
+ソースツリー `ush/` が存在する前提。
+
+```sh
+cd ush
+musl-gcc -static -O2 -Wall -Wextra \
+  -Iinclude \
+  -o ush \
+  src/main.c src/parser.c src/exec.c src/builtins.c src/env.c src/utils.c
+```
+
+## 3.3 生成物
+- `ush/ush`（実行ファイル）
+
+## 3.4 UmuOS への配置
+- 生成した `ush` を UmuOS の `/bin/ush` に配置する
+- `/bin/sh`（BusyBox）は残す（`ENOEXEC` フォールバックで利用）
+
+---
+
+# 4. 定数・制限値（`ush_limits.h`）
 仕様の制限値をコードで固定する。
 
 ```c
@@ -60,7 +87,7 @@ enum {
 
 ---
 
-# 4. エラー/戻り値（`ush_err.h`）
+# 5. エラー/戻り値（`ush_err.h`）
 ## 4.1 Parser 戻り値
 
 ```c
@@ -80,7 +107,7 @@ typedef enum {
 
 ---
 
-# 5. グローバル状態（`ush.h`）
+# 6. グローバル状態（`ush.h`）
 グローバル変数は原則使わず、状態は `struct ush_state` にまとめる。
 
 ```c
@@ -93,7 +120,7 @@ typedef struct {
 
 ---
 
-# 6. utils（`ush_utils.h` / `utils.c`）
+# 7. utils（`ush_utils.h` / `utils.c`）
 ## 6.1 stderr出力
 
 ```c
@@ -130,7 +157,7 @@ int ush_is_comment_line(const char *line);
 
 ---
 
-# 7. 入力取得（main / utils）
+# 8. 入力取得（main / utils）
 ## 7.1 API
 
 ```c
@@ -147,7 +174,7 @@ int ush_read_line(char **line_buf, size_t *cap);
 
 ---
 
-# 8. parser（`ush_parser.h` / `parser.c`）
+# 9. parser（`ush_parser.h` / `parser.c`）
 ## 8.1 API
 
 ```c
@@ -192,7 +219,7 @@ parse_result_t ush_tokenize_inplace(
 
 ---
 
-# 9. builtins（`ush_builtins.h` / `builtins.c`）
+# 10. builtins（`ush_builtins.h` / `builtins.c`）
 ## 9.1 API
 
 ```c
@@ -234,7 +261,7 @@ int ush_run_builtin(ush_state_t *st, char *argv[]);
 
 ---
 
-# 10. env（`ush_env.h` / `env.c`）
+# 11. env（`ush_env.h` / `env.c`）
 ## 10.1 PATH取得
 
 ```c
@@ -247,7 +274,7 @@ const char *ush_get_path_or_default(void);
 
 ---
 
-# 11. exec（`ush_exec.h` / `exec.c`）
+# 12. exec（`ush_exec.h` / `exec.c`）
 ## 11.1 API
 
 ```c
@@ -294,7 +321,7 @@ int ush_exec_external(ush_state_t *st, char *argv[]);
 
 ---
 
-# 12. プロンプト（main）
+# 13. プロンプト（main）
 ## 12.1 形式
 - `UmuOS:ush:<cwd>$`
 
@@ -304,7 +331,7 @@ int ush_exec_external(ush_state_t *st, char *argv[]);
 
 ---
 
-# 13. main（`main.c`）
+# 14. main（`main.c`）
 ## 13.1 エントリ
 
 ```c
@@ -323,7 +350,7 @@ int main(int argc, char **argv);
 
 ---
 
-# 14. 受け入れ基準（コードレベル確認項目）
+# 15. 受け入れ基準（コードレベル確認項目）
 本詳細設計に沿って実装され、基本設計書の受け入れ基準（仕様全項目）を全て満たすこと。
 
 特にコード観点での最低確認:
