@@ -7,5 +7,6 @@
 - DNS：`/etc/resolv.conf` を Google DNS `8.8.8.8` にして外界通信可能にする
 - タイムゾーン：JST（`Japan/Tokyo`）にする
 - NTP：BusyBox の `ntpd` で時刻を同期する
+- Busyboxのsuでsetuidが効かない問題。自作suコマンド作成する
 
 ※適時追加を予定
