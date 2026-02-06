@@ -38,7 +38,16 @@ ping -c 1 8.8.8.8
 
 ### IP / route が入っていない場合
 
-0.1.4-base-stable の想定では `/etc/umu/network.conf` に固定値があり、rcS がそれを読んで設定する。
+補足：0.1.4-base-stable では **disk.img 作成時点で `/etc/umu/network.conf` を投入済み**の運用が前提になっている。
+そのため、すでにゲストへ telnet（`telnetd`）で入れている状況なら、通常はこの節の作業は不要（IP/route は既に成立しているはず）である。
+
+この節は、次のような「例外ケース」の切り分け用。
+
+- disk.img を作り直した / 別手順で用意した
+- `/etc/umu/network.conf` を消した・壊した
+- `ip addr` / `ip route` を見ると IP や default route が入っていない
+
+0.1.4-base-stable の実装では `/etc/umu/network.conf` に固定値があり、`/etc/init.d/rcS` がそれを読んで BusyBox `ip` で設定する。
 
 ゲスト側で確認：
 
@@ -53,12 +62,12 @@ IFNAME=eth0
 MODE=static
 IP=192.168.0.202/24
 GW=192.168.0.1
-DNS=192.168.0.1
+DNS=8.8.8.8
 ```
 
-※この `DNS=` は 0.1.4-base-stable の rcS 実装では参照されない（`/etc/resolv.conf` は別途手動で設定する）。
+※この `DNS=` は 0.1.4-base-stable の rcS 実装では参照されない（DNS は `/etc/resolv.conf` を別途手動で設定する）。
 
-ホスト側から永続ディスクに投入する場合（例：0.1.4-base-stable の `disk/disk.img`）：
+ホスト側から永続ディスクに投入する場合（※例外時のみ。0.1.4-base-stable の `disk/disk.img` を作り直した等）：
 
 ```sh
 sudo mkdir -p /mnt/umuos
@@ -70,7 +79,7 @@ IFNAME=eth0
 MODE=static
 IP=192.168.0.202/24
 GW=192.168.0.1
-DNS=192.168.0.1
+DNS=8.8.8.8
 EOF
 
 sync
