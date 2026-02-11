@@ -19,9 +19,9 @@ status: clean-reproducible-manual
 
 ## 0. 固定値（読むだけ / コマンドに直書き）
 
-- 作業ルート（Ubuntu）：`/home/tama/umu/umu_project/UmuOS-0.1.6-dev`
-- Kernel source：`/home/tama/umu/umu_project/external/linux-6.18.1-kernel`
-- BusyBox source：`/home/tama/umu/umu_project/external/busybox-1.36.1`
+- 作業ルート（Ubuntu）：`/home/tama/umu_project/UmuOS-0.1.6-dev`
+- Kernel source：`/home/tama/umu_project/external/linux-6.18.1`
+- BusyBox source：`/home/tama/umu_project/external/busybox-1.36.1`
 
 - Kernel version：`6.18.1`
 - BusyBox version：`1.36.1`
@@ -78,8 +78,8 @@ apt-cache show libxcrypt-dev >/dev/null 2>&1 && sudo apt install -y libxcrypt-de
 観測点：外部ソース（kernel/busybox）が存在する。
 
 ```bash
-mkdir -p /home/tama/umu/umu_project/UmuOS-0.1.6-dev
-cd /home/tama/umu/umu_project/UmuOS-0.1.6-dev
+mkdir -p /home/tama/umu_project/UmuOS-0.1.6-dev
+cd /home/tama/umu_project/UmuOS-0.1.6-dev
 
 mkdir -p kernel/build \
 	initramfs/src initramfs/rootfs \
@@ -87,8 +87,8 @@ mkdir -p kernel/build \
 	iso_root/boot/grub \
 	disk run logs work tools
 
-test -f /home/tama/umu/umu_project/external/linux-6.18.1-kernel/Makefile
-test -f /home/tama/umu/umu_project/external/busybox-1.36.1/Makefile
+test -f /home/tama/umu_project/external/linux-6.18.1/Makefile
+test -f /home/tama/umu_project/external/busybox-1.36.1/Makefile
 ```
 
 ---
@@ -102,7 +102,7 @@ test -f /home/tama/umu/umu_project/external/busybox-1.36.1/Makefile
 観測点：`/logs/boot.log` に `boot_id/time/uptime` が追記される。
 
 ```bash
-cat > /home/tama/umu/umu_project/UmuOS-0.1.6-dev/tools/rcS_umuos016.sh <<'EOF'
+cat > /home/tama/umu_project/UmuOS-0.1.6-dev/tools/rcS_umuos016.sh <<'EOF'
 #!/bin/sh
 
 export PATH=/umu_bin:/sbin:/bin
@@ -163,7 +163,7 @@ chmod 0755 /umu_bin 2>/dev/null || true
 echo "[rcS] rcS done" > /dev/console 2>/dev/null || true
 EOF
 
-chmod +x /home/tama/umu/umu_project/UmuOS-0.1.6-dev/tools/rcS_umuos016.sh
+chmod +x /home/tama/umu_project/UmuOS-0.1.6-dev/tools/rcS_umuos016.sh
 ```
 
 ### 2.1.2 既存disk.imgへ rcS 差し替えツール（安全弁）
@@ -171,7 +171,7 @@ chmod +x /home/tama/umu/umu_project/UmuOS-0.1.6-dev/tools/rcS_umuos016.sh
 使うのは「どうしてもやり直したくない時」だけ。基本はこの文書の手順で1発で完成する。
 
 ```bash
-cat > /home/tama/umu/umu_project/UmuOS-0.1.6-dev/tools/patch_diskimg_rcS.sh <<'EOF'
+cat > /home/tama/umu_project/UmuOS-0.1.6-dev/tools/patch_diskimg_rcS.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -251,7 +251,7 @@ chmod 0755 "${MNT_DIR}/etc/init.d/rcS"
 say "done"
 EOF
 
-chmod +x /home/tama/umu/umu_project/UmuOS-0.1.6-dev/tools/patch_diskimg_rcS.sh
+chmod +x /home/tama/umu_project/UmuOS-0.1.6-dev/tools/patch_diskimg_rcS.sh
 ```
 
 ### 2.1.3 Rocky起動スクリプト（/rootに3ファイルだけ）
@@ -259,7 +259,7 @@ chmod +x /home/tama/umu/umu_project/UmuOS-0.1.6-dev/tools/patch_diskimg_rcS.sh
 観測点：`ifname=` のtypoを絶対に入れない（以前の事故ポイント）。
 
 ```bash
-cat > /home/tama/umu/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-dev_start.sh <<'EOF'
+cat > /home/tama/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-dev_start.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -349,7 +349,7 @@ CMD_STR="$(printf '%q ' "${QEMU_CMD[@]}")"
 exec script -q -f -c "${CMD_STR}" "${LOG_FILE}"
 EOF
 
-chmod +x /home/tama/umu/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-dev_start.sh
+chmod +x /home/tama/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-dev_start.sh
 ```
 
 ---
@@ -359,18 +359,18 @@ chmod +x /home/tama/umu/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-dev_start.sh
 観測点：ビルドが途中で止まっていないこと（ログにエラーが無い）。
 
 ```bash
-cd /home/tama/umu/umu_project/UmuOS-0.1.6-dev
+cd /home/tama/umu_project/UmuOS-0.1.6-dev
 
-make -C /home/tama/umu/umu_project/external/linux-6.18.1-kernel mrproper
+make -C /home/tama/umu_project/external/linux-6.18.1 mrproper
 
-rm -rf /home/tama/umu/umu_project/UmuOS-0.1.6-dev/kernel/build
-mkdir -p /home/tama/umu/umu_project/UmuOS-0.1.6-dev/kernel/build
+rm -rf /home/tama/umu_project/UmuOS-0.1.6-dev/kernel/build
+mkdir -p /home/tama/umu_project/UmuOS-0.1.6-dev/kernel/build
 
-make -C /home/tama/umu/umu_project/external/linux-6.18.1-kernel \
-  O=/home/tama/umu/umu_project/UmuOS-0.1.6-dev/kernel/build defconfig
+make -C /home/tama/umu_project/external/linux-6.18.1 \
+	O=/home/tama/umu_project/UmuOS-0.1.6-dev/kernel/build defconfig
 
-/home/tama/umu/umu_project/external/linux-6.18.1-kernel/scripts/config \
-  --file /home/tama/umu/umu_project/UmuOS-0.1.6-dev/kernel/build/.config \
+/home/tama/umu_project/external/linux-6.18.1/scripts/config \
+	--file /home/tama/umu_project/UmuOS-0.1.6-dev/kernel/build/.config \
 	-e DEVTMPFS \
 	-e DEVTMPFS_MOUNT \
 	-e BLK_DEV_INITRD \
@@ -387,20 +387,20 @@ make -C /home/tama/umu/umu_project/external/linux-6.18.1-kernel \
 	-e UNIX98_PTYS \
 	-e RD_GZIP
 
-make -C /home/tama/umu/umu_project/external/linux-6.18.1-kernel \
-  O=/home/tama/umu/umu_project/UmuOS-0.1.6-dev/kernel/build olddefconfig
+make -C /home/tama/umu_project/external/linux-6.18.1 \
+	O=/home/tama/umu_project/UmuOS-0.1.6-dev/kernel/build olddefconfig
 
-make -C /home/tama/umu/umu_project/external/linux-6.18.1-kernel \
-	O=/home/tama/umu/umu_project/UmuOS-0.1.6-dev/kernel/build -j4 bzImage \
-	2>&1 | tee /home/tama/umu/umu_project/UmuOS-0.1.6-dev/logs/kernel_build_bzImage.log
+make -C /home/tama/umu_project/external/linux-6.18.1 \
+	O=/home/tama/umu_project/UmuOS-0.1.6-dev/kernel/build -j4 bzImage \
+	2>&1 | tee /home/tama/umu_project/UmuOS-0.1.6-dev/logs/kernel_build_bzImage.log
 
-mkdir -p /home/tama/umu/umu_project/UmuOS-0.1.6-dev/iso_root/boot
-cp -f /home/tama/umu/umu_project/UmuOS-0.1.6-dev/kernel/build/arch/x86/boot/bzImage \
-  /home/tama/umu/umu_project/UmuOS-0.1.6-dev/iso_root/boot/vmlinuz-6.18.1
-cp -f /home/tama/umu/umu_project/UmuOS-0.1.6-dev/kernel/build/.config \
-  /home/tama/umu/umu_project/UmuOS-0.1.6-dev/iso_root/boot/config-6.18.1
+mkdir -p /home/tama/umu_project/UmuOS-0.1.6-dev/iso_root/boot
+cp -f /home/tama/umu_project/UmuOS-0.1.6-dev/kernel/build/arch/x86/boot/bzImage \
+	/home/tama/umu_project/UmuOS-0.1.6-dev/iso_root/boot/vmlinuz-6.18.1
+cp -f /home/tama/umu_project/UmuOS-0.1.6-dev/kernel/build/.config \
+	/home/tama/umu_project/UmuOS-0.1.6-dev/iso_root/boot/config-6.18.1
 
-test -f /home/tama/umu/umu_project/UmuOS-0.1.6-dev/iso_root/boot/vmlinuz-6.18.1
+test -f /home/tama/umu_project/UmuOS-0.1.6-dev/iso_root/boot/vmlinuz-6.18.1
 ```
 
 ---
@@ -410,14 +410,14 @@ test -f /home/tama/umu/umu_project/UmuOS-0.1.6-dev/iso_root/boot/vmlinuz-6.18.1
 観測点：`busybox` が static で、`ntpd/tcpsvd/ftpd` が有効。
 
 ```bash
-cd /home/tama/umu/umu_project/UmuOS-0.1.6-dev
+cd /home/tama/umu_project/UmuOS-0.1.6-dev
 
-rm -rf /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/busybox/work
-mkdir -p /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/busybox/work
-rsync -a --delete /home/tama/umu/umu_project/external/busybox-1.36.1/ \
-  /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/busybox/work/
+rm -rf /home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/busybox/work
+mkdir -p /home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/busybox/work
+rsync -a --delete /home/tama/umu_project/external/busybox-1.36.1/ \
+	/home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/busybox/work/
 
-cd /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/busybox/work
+cd /home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/busybox/work
 make distclean
 make defconfig
 
@@ -456,8 +456,8 @@ if egrep -q '^(# CONFIG_STATIC is not set|CONFIG_TC=y|CONFIG_FEATURE_TC_INGRESS=
 	yes "" | make oldconfig
 fi
 
-cp -f .config /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/busybox/config-1.36.1
-make -j4 2>&1 | tee /home/tama/umu/umu_project/UmuOS-0.1.6-dev/logs/busybox_build.log
+cp -f .config /home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/busybox/config-1.36.1
+make -j4 2>&1 | tee /home/tama/umu_project/UmuOS-0.1.6-dev/logs/busybox_build.log
 
 ls -l busybox
 file busybox
@@ -471,26 +471,26 @@ file busybox
 観測点：`initrd.img-6.18.1` が `iso_root/boot/` にコピーされている。
 
 ```bash
-cd /home/tama/umu/umu_project/UmuOS-0.1.6-dev
+cd /home/tama/umu_project/UmuOS-0.1.6-dev
 
-rm -rf /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs
-mkdir -p /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs/{bin,sbin,etc,proc,sys,dev,dev/pts,run,newroot,tmp}
+rm -rf /home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs
+mkdir -p /home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs/{bin,sbin,etc,proc,sys,dev,dev/pts,run,newroot,tmp}
 
-cp -f /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/busybox/work/busybox \
-	/home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs/bin/busybox
-chmod 755 /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs/bin/busybox
+cp -f /home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/busybox/work/busybox \
+	/home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs/bin/busybox
+chmod 755 /home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs/bin/busybox
 
-sudo chroot /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs /bin/busybox --install -s /bin
-sudo chroot /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs /bin/busybox --install -s /sbin
+sudo chroot /home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs /bin/busybox --install -s /bin
+sudo chroot /home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs /bin/busybox --install -s /sbin
 
-cp -f /home/tama/umu/umu_project/UmuOS-0.1.4-base-stable/initramfs/src/init.c \
-	/home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/src/init.c
+cp -f /home/tama/umu_project/UmuOS-0.1.4-base-stable/initramfs/src/init.c \
+	/home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/src/init.c
 musl-gcc -static -O2 -Wall -Wextra \
-	-o /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs/init \
-	/home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/src/init.c
-chmod 755 /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs/init
+	-o /home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs/init \
+	/home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/src/init.c
+chmod 755 /home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/rootfs/init
 
-cd /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs
+cd /home/tama/umu_project/UmuOS-0.1.6-dev/initramfs
 rm -f initrd.filelist0 initrd.cpio initrd.img-6.18.1
 find rootfs -mindepth 1 -printf '%P\0' > initrd.filelist0
 cd rootfs
@@ -498,10 +498,10 @@ cpio --null -ov --format=newc < ../initrd.filelist0 > ../initrd.cpio
 cd ..
 gzip -9 -c initrd.cpio > initrd.img-6.18.1
 
-mkdir -p /home/tama/umu/umu_project/UmuOS-0.1.6-dev/iso_root/boot
-cp -f initrd.img-6.18.1 /home/tama/umu/umu_project/UmuOS-0.1.6-dev/iso_root/boot/initrd.img-6.18.1
+mkdir -p /home/tama/umu_project/UmuOS-0.1.6-dev/iso_root/boot
+cp -f initrd.img-6.18.1 /home/tama/umu_project/UmuOS-0.1.6-dev/iso_root/boot/initrd.img-6.18.1
 
-test -f /home/tama/umu/umu_project/UmuOS-0.1.6-dev/iso_root/boot/initrd.img-6.18.1
+test -f /home/tama/umu_project/UmuOS-0.1.6-dev/iso_root/boot/initrd.img-6.18.1
 ```
 
 ---
@@ -511,18 +511,18 @@ test -f /home/tama/umu/umu_project/UmuOS-0.1.6-dev/iso_root/boot/initrd.img-6.18
 観測点：`/etc/profile` で `PATH` と `TZ` が固定され、`rcS` がテンプレ版になっている。
 
 ```bash
-cd /home/tama/umu/umu_project/UmuOS-0.1.6-dev
+cd /home/tama/umu_project/UmuOS-0.1.6-dev
 
-rm -f /home/tama/umu/umu_project/UmuOS-0.1.6-dev/disk/disk.img
-truncate -s 4G /home/tama/umu/umu_project/UmuOS-0.1.6-dev/disk/disk.img
-mkfs.ext4 -F -U d2c0b3c3-0b5e-4d24-8c91-09b3a4fb0c15 /home/tama/umu/umu_project/UmuOS-0.1.6-dev/disk/disk.img
+rm -f /home/tama/umu_project/UmuOS-0.1.6-dev/disk/disk.img
+truncate -s 4G /home/tama/umu_project/UmuOS-0.1.6-dev/disk/disk.img
+mkfs.ext4 -F -U d2c0b3c3-0b5e-4d24-8c91-09b3a4fb0c15 /home/tama/umu_project/UmuOS-0.1.6-dev/disk/disk.img
 
 sudo mkdir -p /mnt/umuos016
-sudo mount -o loop /home/tama/umu/umu_project/UmuOS-0.1.6-dev/disk/disk.img /mnt/umuos016
+sudo mount -o loop /home/tama/umu_project/UmuOS-0.1.6-dev/disk/disk.img /mnt/umuos016
 
 sudo mkdir -p /mnt/umuos016/{bin,sbin,etc,proc,sys,dev,dev/pts,run,var,var/run,home,root,tmp,logs,etc/init.d,etc/umu,umu_bin}
 
-sudo cp -f /home/tama/umu/umu_project/UmuOS-0.1.6-dev/initramfs/busybox/work/busybox /mnt/umuos016/bin/busybox
+sudo cp -f /home/tama/umu_project/UmuOS-0.1.6-dev/initramfs/busybox/work/busybox /mnt/umuos016/bin/busybox
 sudo chown root:root /mnt/umuos016/bin/busybox
 sudo chmod 755 /mnt/umuos016/bin/busybox
 sudo chroot /mnt/umuos016 /bin/busybox --install -s /bin
@@ -638,7 +638,7 @@ sudo chown root:root /mnt/umuos016/umu_bin/ntp_sync
 sudo chmod 0755 /mnt/umuos016/umu_bin/ntp_sync
 
 # rcS はテンプレ1本からインストール（この文書の完成形）
-sudo install -m 0755 /home/tama/umu/umu_project/UmuOS-0.1.6-dev/tools/rcS_umuos016.sh /mnt/umuos016/etc/init.d/rcS
+sudo install -m 0755 /home/tama/umu_project/UmuOS-0.1.6-dev/tools/rcS_umuos016.sh /mnt/umuos016/etc/init.d/rcS
 ```
 
 ### 6.1 パスワード（手で貼る）
@@ -667,9 +667,9 @@ sudo chmod 600 /mnt/umuos016/etc/shadow
 観測点：`chmod 4755` を必ず通す（root切替の成立条件）。
 
 ```bash
-cd /home/tama/umu/umu_project/UmuOS-0.1.6-dev
+cd /home/tama/umu_project/UmuOS-0.1.6-dev
 
-cat > /home/tama/umu/umu_project/UmuOS-0.1.6-dev/work/umu_su.c <<'EOF'
+cat > /home/tama/umu_project/UmuOS-0.1.6-dev/work/umu_su.c <<'EOF'
 #define _GNU_SOURCE
 
 #include <crypt.h>
@@ -754,13 +754,13 @@ int main(void) {
 }
 EOF
 
-cd /home/tama/umu/umu_project/UmuOS-0.1.6-dev/work
+cd /home/tama/umu_project/UmuOS-0.1.6-dev/work
 gcc -static -Os -s -o umu_su umu_su.c -lcrypt || true
 if [ ! -f umu_su ]; then
 	gcc -static -Os -s -o umu_su umu_su.c -lxcrypt
 fi
 
-sudo cp -f /home/tama/umu/umu_project/UmuOS-0.1.6-dev/work/umu_su /mnt/umuos016/umu_bin/su
+sudo cp -f /home/tama/umu_project/UmuOS-0.1.6-dev/work/umu_su /mnt/umuos016/umu_bin/su
 sudo chown root:root /mnt/umuos016/umu_bin/su
 sudo chmod 4755 /mnt/umuos016/umu_bin/su
 ```
@@ -784,9 +784,9 @@ sudo umount /mnt/umuos016
 観測点：ISOが生成され、ファイルサイズが0でない。
 
 ```bash
-cd /home/tama/umu/umu_project/UmuOS-0.1.6-dev
+cd /home/tama/umu_project/UmuOS-0.1.6-dev
 
-cat > /home/tama/umu/umu_project/UmuOS-0.1.6-dev/iso_root/boot/grub/grub.cfg <<'EOF'
+cat > /home/tama/umu_project/UmuOS-0.1.6-dev/iso_root/boot/grub/grub.cfg <<'EOF'
 set timeout=20
 set default=0
 
@@ -809,10 +809,10 @@ initrd /boot/initrd.img-6.18.1
 }
 EOF
 
-grub-mkrescue -o /home/tama/umu/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-boot.iso \
-	/home/tama/umu/umu_project/UmuOS-0.1.6-dev/iso_root
+grub-mkrescue -o /home/tama/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-boot.iso \
+	/home/tama/umu_project/UmuOS-0.1.6-dev/iso_root
 
-ls -l /home/tama/umu/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-boot.iso
+ls -l /home/tama/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-boot.iso
 ```
 
 ---
@@ -871,5 +871,5 @@ nc -4 -l 12345 > UmuOS-0.1.6-boot.iso
 
 ```bash
 # Ubuntu（送信側）
-nc -4 192.168.0.200 12345 < /home/tama/umu/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-boot.iso
+nc -4 192.168.0.200 12345 < /home/tama/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-boot.iso
 ```
