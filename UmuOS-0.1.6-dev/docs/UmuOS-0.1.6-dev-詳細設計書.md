@@ -4,13 +4,13 @@ date: 2026-02-11
 status: clean-reproducible-manual
 ---
 
-# UmuOS-0.1.6-dev 詳細設計書（迷いにくい版 / TeraTermコピペ手順書 / 変数なし）
+# UmuOS-0.1.6-dev 詳細設計書
 
 目的：UmuOS-0.1.6-dev を **最初のPKGインストールから**、途中で修正を挟まずに最後まで再現できる手順にする。
 
 この文書のルール（今回の反省を踏まえた固定ルール）：
 
-- コマンドは必ずコードブロック（```bash）に入れる（コピペ事故防止）。
+- コマンドは必ずコードブロック（```bash）に入れる。
 - `rcS` は「テンプレ1本」を作り、disk.imgへは `install` で配置する（rcS二重管理を禁止）。
 - `PATH/TZ/NTP/FTP公開ルート` は disk.img 側に統合し、起動のたびに同じ動きをする。
 - Rocky 側は `/root` に **ISO + disk.img + start.sh の3つだけ**で起動できる形にする。
@@ -596,7 +596,7 @@ sudo chmod 0755 /mnt/umuos016/umu_bin
 
 sudo tee /mnt/umuos016/umu_bin/ll >/dev/null <<'EOF'
 #!/bin/sh
-exec ls -lF "$@"
+exec ls -l "$@"
 EOF
 sudo chown root:root /mnt/umuos016/umu_bin/ll
 sudo chmod 0755 /mnt/umuos016/umu_bin/ll
