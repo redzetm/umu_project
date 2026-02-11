@@ -1,54 +1,58 @@
 ---
 title: UmuOS-0.1.5-dev 基本設計書
-date: 2026-02-09
-base_design: "../../UmuOS-0.1.4-base-stable/docs/UmuOS-0.1.4-base-stable-基本設計書.md"
-status: draft-for-review
+date: 2026-02-11
+status: rewrite-for-manual
 ---
 
-# 1. 目的 / 位置づけ
+# UmuOS-0.1.5-dev 基本設計書
 
-UmuOS-0.1.5-dev は、UmuOS-0.1.4-base-stable（受入済み）を踏襲しつつ、ユーザーランド開発を進めるために必要な「開発に直結する最小機能」を OS 側へ統合する。
+この文書は「何を作るか（要件/固定値/責務境界）」を定義する。
+作業コマンド（どう作るか）は詳細設計書（`UmuOS-0.1.5-dev-詳細設計書.md`）に集約する。
 
-0.1.4 まで「手動で実装していた」追加機能（DNS、JST、NTP、`/umu_bin`、`ll`、自作 `su`、`ftpd`）を、**再現可能なビルド/設定手順**として固定化する。
+## 1. 目的 / 位置づけ
 
-重要方針（固定）：
+UmuOS-0.1.5-dev は、UmuOS-0.1.4-base-stable（成功実績あり）を前提に、ユーザーランド開発で必要な最小の周辺機能を「永続 rootfs（ext4: disk.img）側」に統合する。
 
-- 0.1.4-base-stable の成立条件（`switch_root`、ttyS0/ttyS1ログイン、`/logs/boot.log`、telnetd、固定IP、nc転送）を壊さない。
-- 追加機能は「最後に追記」ではなく、**起動フロー/責務境界に合わせて設計上自然な位置**へ組み込む。
-- 追加機能の成立に必要な前提（DNS/外界疎通、setuid、ポート21等）を設計上の必須条件として明文化し、実装ノート（0.1.4）で判明したハマりどころを先に潰す。
-- 本書および詳細設計書の手順では、`/home/tama/...` など **絶対パスを用いる**（`$HOME` や `~` など、環境依存の書き方をしない）。
+追加するのは、0.1.4 までは手作業で差し込んでいた機能（DNS/JST/NTP、`/umu_bin`、`ll`、自作 `su`、`ftpd`）であり、起動フローの責務境界に沿って rcS と永続 rootfs の構成として固定する。
 
-# 2. スコープ
+## 2. 重要方針（固定）
 
-## 2.1 やること（固定）
+- 0.1.4-base-stable の成立条件を壊さない。
+- 追加機能は initramfs 側に入れず、永続 rootfs（disk.img）側へ統合する。
+- 作業手順は「TeraTerm でコピペ実行できる」ことを最優先にする。
+  - 1ブロック＝1貼り付け、対話操作（`menuconfig`）を避ける。
+  - パスは絶対パスで固定し、変数を使う場合も絶対パス値のみを格納する。
+- 検証（観測点）は“必須のゲート”にしない。失敗時の切り分け点としてのみ提示する。
 
-- 0.1.4-base-stable 相当のベースを再現可能に構築する。
-  - Linux kernel 6.18.1 + initramfs（`switch_root`）+ ext4 永続 rootfs（`disk.img`）+ BusyBox ユーザーランド
-  - ttyS0/ttyS1 同時ログイン（`root`/`tama`）
-  - `/logs/boot.log` 追記
-  - ゲスト固定IP（`192.168.0.202/24`）+ default route（`192.168.0.1`）
-  - BusyBox `telnetd` を TCP/23 で待受（`/bin/login`）
-  - BusyBox `nc` によるファイル転送
+## 3. スコープ
 
-- 0.1.5-dev の追加機能を成立させる。
-  - DNS：`/etc/resolv.conf` を Google Public DNS に固定し、ホスト名解決を成立させる
-  - タイムゾーン：JST を固定（`/etc/TZ` 方式）
-  - 時刻同期：BusyBox `ntpd` により時刻同期を実施できる（手動/自動の方針は詳細設計で固定）
-  - 自作コマンド置き場：`/umu_bin` を追加し、検索パス先頭へ固定する
-  - `ll`：`/umu_bin/ll` として提供する
-  - `su`：BusyBox `su` の setuid 問題に依存せず、最小の自作 `su` を `/umu_bin/su` として成立させる（rootパスワード必須）
-  - FTP：BusyBox `tcpsvd` + BusyBox `ftpd` を用い、LAN 内でファイル転送を可能にする（平文なのでLAN内限定）
+### 3.1 やること（固定）
 
-## 2.2 やらないこと（固定）
+0.1.4 互換のベース（カーネル/initramfs/switch_root/永続 rootfs/ログイン/ネットワーク/telnet）を保ったまま、以下を統合する。
+
+- DNS：`/etc/resolv.conf` を固定し、名前解決が可能。
+- JST：`/etc/TZ` を `JST-9` に固定。
+- NTP：BusyBox `ntpd` を手動起動できる（起動時自動同期はしない）。
+- `/umu_bin`：PATH 先頭固定（rcS で export）。
+- `ll`：`/umu_bin/ll`（`ls -lF` ラッパ）。
+- `su`：BusyBox `su` に依存しない自作 `/umu_bin/su`（setuid）。
+- FTP：BusyBox `tcpsvd` + `ftpd` を LAN 内限定で常駐。
+
+### 3.2 やらないこと（固定）
 
 - SSH 導入
 - インターネット越し運用（WAN 露出）
 - 監視・自動再起動（systemd ユニット化等）
 - 0.1.4-base-stable の受入条件に無関係な大規模改変（initramfs設計の全面変更など）
 
-# 3. 前提環境 / 固定値
+## 4. 前提環境 / 固定値（この文書で固定）
 
-## 3.1 ネットワーク前提（固定IP）
+### 4.1 作業環境
+
+- 作業ホスト：Ubuntu 24.04 LTS
+- 操作：TeraTerm から貼り付けて bash へ投入できること
+
+### 4.2 ネットワーク前提（固定IP）
 
 - RockyLinux（ホスト）：`192.168.0.200`
 - Ubuntu（開発）：`192.168.0.201`
@@ -57,14 +61,22 @@ UmuOS-0.1.5-dev は、UmuOS-0.1.4-base-stable（受入済み）を踏襲しつ�
 - ゲストは TAP（`tap-umu`）を介して `br0` に接続し、LAN に L2 参加する。
 - libvirt 管理下の `vnet*` は使用しない。
 
-## 3.2 ツール/ソース（固定）
+### 4.3 ツール/ソース（固定）
 
 - Linux kernel：`6.18.1`（ソース：`/home/tama/umu/umu_project/external/linux-6.18.1-kernel/`）
 - BusyBox：`1.36.1`（ソース：`/home/tama/umu/umu_project/external/busybox-1.36.1/`）
 
-# 4. 要件 / 受入基準
+### 4.4 生成物（固定名）
 
-## 4.1 0.1.4 相当（維持、固定）
+- ISO：`UmuOS-0.1.5-boot.iso`
+- kernel（ISO入力）：`iso_root/boot/vmlinuz-6.18.1`
+- initrd（ISO入力）：`iso_root/boot/initrd.img-6.18.1`
+- 永続ディスク：`disk/disk.img`
+- rootfs UUID：`d2c0b3c3-0b5e-4d24-8c91-09b3a4fb0c15`
+
+## 5. 要件（合格条件の定義）
+
+### 5.1 0.1.4 相当（維持）
 
 - `switch_root` が成立する。
 - ttyS0 で `root`/`tama` のパスワードログインが成立する。
@@ -75,39 +87,21 @@ UmuOS-0.1.5-dev は、UmuOS-0.1.4-base-stable（受入済み）を踏襲しつ�
 - LAN 端末から `192.168.0.202:23` に接続し、`root` と `tama` のログインが成功する。
 - Ubuntu から `nc` でゲストへファイル転送が成功する。
 
-## 4.2 0.1.5 追加（固定）
+### 5.2 0.1.5 追加（固定）
 
-DNS：
+DNS：名前解決できる（例：`ping -c 1 google.com`）。
 
-- `ping -c 1 8.8.8.8` が成功する（L3 到達性）
-- `ping -c 1 google.com` が成功する（DNS 解決）
-- BusyBox `wget` を使える場合は `wget -O - http://example.com` が成功する（外界疎通）
+タイムゾーン/時刻：`/etc/TZ` が `JST-9`、かつ `ntpd` による同期が実行できる。
 
-タイムゾーン/時刻：
+`/umu_bin`：PATH 先頭、権限 `root:root 0755`。
 
-- `date` 表示が JST（UTC+9）として扱われる（`/etc/TZ` により固定）
-- `ntpd` により時刻同期が実施できる（手動で実行して `date` が更新される）
+`ll`：`/umu_bin/ll` が `ls -lF` 相当。
 
-`/umu_bin`：
+`su`：一般ユーザーから `/umu_bin/su` で root へ切替（root パスワード必須）。
 
-- `/umu_bin` が `root:root` で、書き込みは root のみに制限される（`0755`）
-- 検索パスは `/umu_bin` が先頭になる（`/umu_bin` 上のコマンドが優先される）
+FTP：LAN 内から接続でき、`get/put` が可能。
 
-`ll`：
-
-- `ll /` が `ls -lF /` 相当として動作する。
-
-`su`：
-
-- 一般ユーザー（例：`tama`）でログイン後、`/umu_bin/su` 実行で root へ切替できる。
-- root への切替はパスワード必須で、`/etc/shadow` の root ハッシュで検証される。
-
-FTP：
-
-- BusyBox `tcpsvd` を常駐させ、接続ごとに BusyBox `ftpd` が起動する。
-- LAN 内の Ubuntu から FTP 接続し、`binary` モードで `get/put` ができる。
-
-# 5. 全体アーキテクチャ
+## 6. 全体アーキテクチャ（責務境界）
 
 0.1.4-base-stable と同様：
 
@@ -124,7 +118,7 @@ FTP：
   - リモートログイン：BusyBox `telnetd` → BusyBox `login`
   - FTP：BusyBox `tcpsvd` → BusyBox `ftpd`
 
-# 6. 成果物 / ディレクトリ設計（固定）
+## 7. 成果物 / ディレクトリ設計（固定）
 
 生成物は `UmuOS-0.1.5-dev/` 配下に閉じる。
 
@@ -136,7 +130,7 @@ FTP：
 - `logs/`：ホストログ/観測メモ
 - `docs/`：設計書
 
-# 7. 外部インタフェース（I/F）
+## 8. 外部インタフェース（I/F）
 
 ## 7.1 ホスト起動I/F
 
@@ -151,7 +145,7 @@ FTP：
 - `/etc/TZ`：JST（0.1.5で固定）
 - `/etc/securetty`：root ログイン制御（telnetの root 失敗を最優先切り分け点として維持）
 
-## 7.3 rcS 責務境界（0.1.5で拡張）
+### 8.3 rcS 責務境界（0.1.5で拡張）
 
 rcS は `switch_root` 後（ext4 rootfs 側）で実行される初期化スクリプト。
 
@@ -164,20 +158,14 @@ rcS は `switch_root` 後（ext4 rootfs 側）で実行される初期化スク�
 - `telnetd` 起動（0.1.4踏襲）
 - FTP サービス起動（`tcpsvd` 常駐、PID を `/run/ftpd.pid` へ保存）
 - （方針は詳細設計で固定）NTP 同期（`ntpd`）を起動時に実行できる設計にする
+## 9. 実装方針（ハマりどころを設計に吸収）
 
-# 8. ハマりどころ（0.1.4 実装ノートからの設計反映）
+- BusyBox は `olddefconfig` が無い。`.config` の反映は `make oldconfig` を使う。
+- initrd filelist 生成（`find ... > filelist`）は無音が正常。
+- `cpio` は `rootfs` をカレントにして実行する（ディレクトリ基準のミスを避ける）。
+- telnet で root だけ失敗する場合は `/etc/securetty` を最優先切り分け。
+- setuid を使う `su` は、`/` が `nosuid` だと成立しない（ゲスト側 `mount` で確認）。
 
-- BusyBox は kernel のような `olddefconfig` が無い。整合は `make oldconfig`。
-- initrd filelist の生成（`find ... > filelist`）は **無音が正常**。途中で中断した場合は作り直す。
-- `cpio` は `rootfs` をカレントにして実行する（ディレクトリ基準を誤ると `stat` エラーになりやすい）。
-- telnet で root だけ失敗する場合は `/etc/securetty` を最優先。
-- setuid を使う `su` は、`/` が `nosuid` でマウントされていると成立しない。`mount` で切り分ける。
-- BusyBox の `tc` は環境によりコンパイルエラーになりやすく、必須でないなら無効化して通す。
+## 10. 手順書
 
-# 9. 詳細設計で確定する項目
-
-- Linux 6.18.1 の kernel `.config`（`virtio-net` を built-in にする等）
-- BusyBox 1.36.1 の `.config`（0.1.4必須 applet + 0.1.5追加 applet：`ntpd`/`tcpsvd`/`ftpd`/`wget`/`nslookup` 等）
-- rcS の具体コマンド列（失敗時の扱い、NTP を自動で走らせるか、FTP を 21/2121 のどちらに固定するか）
-
-確定場所：`docs/UmuOS-0.1.5-dev-詳細設計書.md`
+作業コマンドは詳細設計書に集約する：`docs/UmuOS-0.1.5-dev-詳細設計書.md`
