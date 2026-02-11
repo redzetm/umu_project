@@ -36,7 +36,7 @@ related_docs:
   - 起動時に1回だけ NTP 同期（BusyBox `ntpd` を利用）
 - ユーティリティ
   - `/umu_bin` を最優先 PATH にする
-  - `ll`（`ls -lF` のラッパ）
+  - `ll`（`ls -l` のラッパ）
 - リモート
   - telnet ログイン（BusyBox `telnetd` + `login`）
   - FTP サーバ（BusyBox `tcpsvd` + `ftpd`、公開ルート `/`）
