@@ -5,9 +5,10 @@ base_design: "./UmuOS-0.1.5-dev-基本設計書.md"
 status: rewrite-for-manual
 ---
 
-# UmuOS-0.1.5-dev 詳細設計書（TeraTerm コピペ手順書）
+# UmuOS-0.1.5-dev 詳細設計書（TeraTerm コピペ手順書 / 変数なし）
 
 この文書は、UmuOS-0.1.5-dev を「手元で手動構築」するための **コマンド貼り付け手順**のみを記載する。
+手順の追跡性を優先し、`export ...` のような“前提変数ブロック”は使用しない。
 
 設計方針：
 
@@ -18,37 +19,34 @@ status: rewrite-for-manual
 
 ---
 
-## 0. 最初に貼る（固定値の定義）
+## 0. 固定値（読むだけ / コマンドに直接埋め込む）
 
-最初にこのブロックを 1 回だけ貼る。以降は、この変数を前提にコピペする。
+- 作業ルート（Ubuntu）：`/home/tama/umu/umu_project/UmuOS-0.1.5-dev`
+- Kernel source：`/home/tama/umu/umu_project/external/linux-6.18.1-kernel`
+- BusyBox source：`/home/tama/umu/umu_project/external/busybox-1.36.1`
 
-```bash
-export UMU=/home/tama/umu/umu_project
-export W=$UMU/UmuOS-0.1.5-dev
+- Kernel version：`6.18.1`
+- BusyBox version：`1.36.1`
 
-export KVER=6.18.1
-export BBVER=1.36.1
+- ISO：`UmuOS-0.1.5-boot.iso`
+- initrd：`initrd.img-6.18.1`
+- kernel：`vmlinuz-6.18.1`
 
-export KERNEL_SRC=$UMU/external/linux-6.18.1-kernel
-export BB_SRC=$UMU/external/busybox-1.36.1
+- 永続ディスク：`disk/disk.img`（ext4、4GiB、UUID固定）
+- rootfs UUID：`d2c0b3c3-0b5e-4d24-8c91-09b3a4fb0c15`
 
-export ISO_NAME=UmuOS-0.1.5-boot.iso
-export DISK_UUID=d2c0b3c3-0b5e-4d24-8c91-09b3a4fb0c15
+- ゲストIP：`192.168.0.202/24`
+- GW：`192.168.0.1`
+- DNS：`8.8.8.8`、`8.8.4.4`
 
-export IP_ADDR=192.168.0.202/24
-export GW_ADDR=192.168.0.1
+- タイムゾーン：`/etc/TZ` に `JST-9`
+- NTP サーバ：`time.google.com`
 
-export DNS1=8.8.8.8
-export DNS2=8.8.4.4
-
-export TZ_VALUE=JST-9
-export NTP_SERVER=time.google.com
-
-export TTY1_TCP=127.0.0.1:5555
-export TAP_NAME=tap-umu
-```
+- ttyS1 TCP シリアル（Rocky側）：`127.0.0.1:5555`
+- TAP 名（Rocky側）：`tap-umu`
 
 ---
+
 ## 1. Ubuntu 事前準備（パッケージ）
 
 ```bash
@@ -72,17 +70,17 @@ sudo apt install -y libxcrypt-dev || true
 ## 2. 作業ディレクトリ（初期化）
 
 ```bash
-mkdir -p "$W"
-cd "$W"
+mkdir -p /home/tama/umu/umu_project/UmuOS-0.1.5-dev
+cd /home/tama/umu/umu_project/UmuOS-0.1.5-dev
 
 mkdir -p kernel/build \
-				 initramfs/src initramfs/rootfs \
-				 initramfs/busybox \
-				 iso_root/boot/grub \
-				 disk run logs work
+		 initramfs/src initramfs/rootfs \
+		 initramfs/busybox \
+		 iso_root/boot/grub \
+		 disk run logs work
 
-test -f "$KERNEL_SRC/Makefile"
-test -f "$BB_SRC/Makefile"
+test -f /home/tama/umu/umu_project/external/linux-6.18.1-kernel/Makefile
+test -f /home/tama/umu/umu_project/external/busybox-1.36.1/Makefile
 ```
 
 ---
@@ -92,16 +90,18 @@ test -f "$BB_SRC/Makefile"
 貼り付け後、ビルドが終わるまで中断しない（中断すると成果物が出ない）。
 
 ```bash
-cd "$W"
+cd /home/tama/umu/umu_project/UmuOS-0.1.5-dev
 
-make -C "$KERNEL_SRC" mrproper
+make -C /home/tama/umu/umu_project/external/linux-6.18.1-kernel mrproper
 
-rm -rf "$W/kernel/build"
-mkdir -p "$W/kernel/build"
+rm -rf /home/tama/umu/umu_project/UmuOS-0.1.5-dev/kernel/build
+mkdir -p /home/tama/umu/umu_project/UmuOS-0.1.5-dev/kernel/build
 
-make -C "$KERNEL_SRC" O="$W/kernel/build" defconfig
+make -C /home/tama/umu/umu_project/external/linux-6.18.1-kernel \
+  O=/home/tama/umu/umu_project/UmuOS-0.1.5-dev/kernel/build defconfig
 
-"$KERNEL_SRC"/scripts/config --file "$W/kernel/build/.config" \
+/home/tama/umu/umu_project/external/linux-6.18.1-kernel/scripts/config \
+  --file /home/tama/umu/umu_project/UmuOS-0.1.5-dev/kernel/build/.config \
 	-e DEVTMPFS \
 	-e DEVTMPFS_MOUNT \
 	-e BLK_DEV_INITRD \
@@ -118,15 +118,19 @@ make -C "$KERNEL_SRC" O="$W/kernel/build" defconfig
 	-e UNIX98_PTYS \
 	-e RD_GZIP
 
-make -C "$KERNEL_SRC" O="$W/kernel/build" olddefconfig
+make -C /home/tama/umu/umu_project/external/linux-6.18.1-kernel \
+  O=/home/tama/umu/umu_project/UmuOS-0.1.5-dev/kernel/build olddefconfig
 
-LOG="$W/logs/kernel_build_bzImage_$(date +%Y%m%d_%H%M%S).log"
-( make -C "$KERNEL_SRC" O="$W/kernel/build" -j4 bzImage ) >"$LOG" 2>&1
-echo "[done] kernel bzImage build; log=$LOG"
+# ビルドログは固定名で上書き（追いかけやすさ優先）
+( make -C /home/tama/umu/umu_project/external/linux-6.18.1-kernel \
+    O=/home/tama/umu/umu_project/UmuOS-0.1.5-dev/kernel/build -j4 bzImage \
+  ) > /home/tama/umu/umu_project/UmuOS-0.1.5-dev/logs/kernel_build_bzImage.log 2>&1
 
-mkdir -p "$W/iso_root/boot"
-cp -f "$W/kernel/build/arch/x86/boot/bzImage" "$W/iso_root/boot/vmlinuz-$KVER"
-cp -f "$W/kernel/build/.config" "$W/iso_root/boot/config-$KVER"
+mkdir -p /home/tama/umu/umu_project/UmuOS-0.1.5-dev/iso_root/boot
+cp -f /home/tama/umu/umu_project/UmuOS-0.1.5-dev/kernel/build/arch/x86/boot/bzImage \
+  /home/tama/umu/umu_project/UmuOS-0.1.5-dev/iso_root/boot/vmlinuz-6.18.1
+cp -f /home/tama/umu/umu_project/UmuOS-0.1.5-dev/kernel/build/.config \
+  /home/tama/umu/umu_project/UmuOS-0.1.5-dev/iso_root/boot/config-6.18.1
 ```
 
 ---
@@ -134,88 +138,78 @@ cp -f "$W/kernel/build/.config" "$W/iso_root/boot/config-$KVER"
 ## 4. BusyBox（静的リンク、対話なし）
 
 ```bash
-cd "$W"
+cd /home/tama/umu/umu_project/UmuOS-0.1.5-dev
 
-rm -rf "$W/initramfs/busybox/work"
-mkdir -p "$W/initramfs/busybox/work"
-rsync -a --delete "$BB_SRC/" "$W/initramfs/busybox/work/"
+rm -rf /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/busybox/work
+mkdir -p /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/busybox/work
+rsync -a --delete /home/tama/umu/umu_project/external/busybox-1.36.1/ \
+  /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/busybox/work/
 
-cd "$W/initramfs/busybox/work"
+cd /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/busybox/work
 make distclean
 make defconfig
 
-bb_set() {
-	k="$1"
-	if grep -q "^${k}=" .config; then
-		sed -i "s/^${k}=.*/${k}=y/" .config
-	elif grep -q "^# ${k} is not set" .config; then
-		sed -i "s/^# ${k} is not set/${k}=y/" .config
-	else
-		echo "${k}=y" >> .config
-	fi
-}
+# 追跡性を優先し、.config の末尾に追記して上書きする（最後の指定が勝つ）
+cat >> .config <<'EOF'
+CONFIG_STATIC=y
+CONFIG_INIT=y
+CONFIG_FEATURE_USE_INITTAB=y
+CONFIG_GETTY=y
+CONFIG_SWITCH_ROOT=y
+CONFIG_TELNETD=y
+CONFIG_FEATURE_TELNETD_STANDALONE=y
+CONFIG_LOGIN=y
+CONFIG_IP=y
+CONFIG_NC=y
 
-# 必須（0.1.4互換）
-bb_set CONFIG_STATIC
-bb_set CONFIG_INIT
-bb_set CONFIG_FEATURE_USE_INITTAB
-bb_set CONFIG_GETTY
-bb_set CONFIG_SWITCH_ROOT
-bb_set CONFIG_TELNETD
-bb_set CONFIG_FEATURE_TELNETD_STANDALONE
-bb_set CONFIG_LOGIN
-bb_set CONFIG_IP
-bb_set CONFIG_NC
-
-# 追加（0.1.5-dev）
-bb_set CONFIG_WGET
-bb_set CONFIG_PING
-bb_set CONFIG_NSLOOKUP
-bb_set CONFIG_NTPD
-bb_set CONFIG_TCPSVD
-bb_set CONFIG_FTPD
-
-# ビルドが止まる場合に備え、必須でないものは基本OFF（必要になったら個別にON）
-# （例：CONFIG_TC は環境によりビルドエラーになりやすい）
+CONFIG_WGET=y
+CONFIG_PING=y
+CONFIG_NSLOOKUP=y
+CONFIG_NTPD=y
+CONFIG_TCPSVD=y
+CONFIG_FTPD=y
+EOF
 
 yes "" | make oldconfig
-cp -f .config "$W/initramfs/busybox/config-$BBVER"
+cp -f .config /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/busybox/config-1.36.1
 
-LOG="$W/logs/busybox_build_$(date +%Y%m%d_%H%M%S).log"
-( make -j4 ) >"$LOG" 2>&1
-echo "[done] busybox build; log=$LOG"
+( make -j4 ) > /home/tama/umu/umu_project/UmuOS-0.1.5-dev/logs/busybox_build.log 2>&1
 ```
 
 ---
 
-## 5. initramfs（initrd.img-${KVER}）
+## 5. initramfs（initrd.img-6.18.1）
 
 ```bash
-cd "$W"
+cd /home/tama/umu/umu_project/UmuOS-0.1.5-dev
 
-rm -rf "$W/initramfs/rootfs"
-mkdir -p "$W/initramfs/rootfs"/{bin,sbin,etc,proc,sys,dev,dev/pts,run,newroot,tmp}
+rm -rf /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/rootfs
+mkdir -p /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/rootfs/{bin,sbin,etc,proc,sys,dev,dev/pts,run,newroot,tmp}
 
-cp -f "$W/initramfs/busybox/work/busybox" "$W/initramfs/rootfs/bin/busybox"
-chmod 755 "$W/initramfs/rootfs/bin/busybox"
+cp -f /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/busybox/work/busybox \
+	/home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/rootfs/bin/busybox
+chmod 755 /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/rootfs/bin/busybox
 
-sudo chroot "$W/initramfs/rootfs" /bin/busybox --install -s /bin
-sudo chroot "$W/initramfs/rootfs" /bin/busybox --install -s /sbin
+sudo chroot /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/rootfs /bin/busybox --install -s /bin
+sudo chroot /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/rootfs /bin/busybox --install -s /sbin
 
-cp -f "$UMU/UmuOS-0.1.4-base-stable/initramfs/src/init.c" "$W/initramfs/src/init.c"
-musl-gcc -static -O2 -Wall -Wextra -o "$W/initramfs/rootfs/init" "$W/initramfs/src/init.c"
-chmod 755 "$W/initramfs/rootfs/init"
+cp -f /home/tama/umu/umu_project/UmuOS-0.1.4-base-stable/initramfs/src/init.c \
+	/home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/src/init.c
+musl-gcc -static -O2 -Wall -Wextra \
+	-o /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/rootfs/init \
+	/home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/src/init.c
+chmod 755 /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/rootfs/init
 
-cd "$W/initramfs"
-rm -f initrd.filelist0 initrd.cpio initrd.cpio.list "initrd.img-$KVER"
+cd /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs
+rm -f initrd.filelist0 initrd.cpio initrd.cpio.list initrd.img-6.18.1
 find rootfs -mindepth 1 -printf '%P\0' > initrd.filelist0
 cd rootfs
 cpio --null -ov --format=newc < ../initrd.filelist0 > ../initrd.cpio
 cd ..
-gzip -9 -c initrd.cpio > "initrd.img-$KVER"
+gzip -9 -c initrd.cpio > initrd.img-6.18.1
 
-mkdir -p "$W/iso_root/boot"
-cp -f "initrd.img-$KVER" "$W/iso_root/boot/initrd.img-$KVER"
+mkdir -p /home/tama/umu/umu_project/UmuOS-0.1.5-dev/iso_root/boot
+cp -f initrd.img-6.18.1 /home/tama/umu/umu_project/UmuOS-0.1.5-dev/iso_root/boot/initrd.img-6.18.1
 ```
 
 ---
@@ -223,18 +217,18 @@ cp -f "initrd.img-$KVER" "$W/iso_root/boot/initrd.img-$KVER"
 ## 6. disk.img（永続 rootfs）
 
 ```bash
-cd "$W"
+cd /home/tama/umu/umu_project/UmuOS-0.1.5-dev
 
-rm -f "$W/disk/disk.img"
-truncate -s 4G "$W/disk/disk.img"
-mkfs.ext4 -F -U "$DISK_UUID" "$W/disk/disk.img"
+rm -f /home/tama/umu/umu_project/UmuOS-0.1.5-dev/disk/disk.img
+truncate -s 4G /home/tama/umu/umu_project/UmuOS-0.1.5-dev/disk/disk.img
+mkfs.ext4 -F -U d2c0b3c3-0b5e-4d24-8c91-09b3a4fb0c15 /home/tama/umu/umu_project/UmuOS-0.1.5-dev/disk/disk.img
 
 sudo mkdir -p /mnt/umuos015
-sudo mount -o loop "$W/disk/disk.img" /mnt/umuos015
+sudo mount -o loop /home/tama/umu/umu_project/UmuOS-0.1.5-dev/disk/disk.img /mnt/umuos015
 
 sudo mkdir -p /mnt/umuos015/{bin,sbin,etc,proc,sys,dev,dev/pts,run,var,var/run,home,root,tmp,logs,etc/init.d,etc/umu,umu_bin}
 
-sudo cp -f "$W/initramfs/busybox/work/busybox" /mnt/umuos015/bin/busybox
+sudo cp -f /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/busybox/work/busybox /mnt/umuos015/bin/busybox
 sudo chown root:root /mnt/umuos015/bin/busybox
 sudo chmod 755 /mnt/umuos015/bin/busybox
 sudo chroot /mnt/umuos015 /bin/busybox --install -s /bin
@@ -251,21 +245,21 @@ ttyS1::respawn:/sbin/getty -L 115200 ttyS1 vt100
 ::shutdown:/bin/umount -a
 EOF
 
-sudo tee /mnt/umuos015/etc/umu/network.conf >/dev/null <<EOF
+sudo tee /mnt/umuos015/etc/umu/network.conf >/dev/null <<'EOF'
 IFNAME=eth0
 MODE=static
-IP=$IP_ADDR
-GW=$GW_ADDR
-DNS=$DNS1
+IP=192.168.0.202/24
+GW=192.168.0.1
+DNS=8.8.8.8
 EOF
 
-sudo tee /mnt/umuos015/etc/resolv.conf >/dev/null <<EOF
-nameserver $DNS1
-nameserver $DNS2
+sudo tee /mnt/umuos015/etc/resolv.conf >/dev/null <<'EOF'
+nameserver 8.8.8.8
+nameserver 8.8.4.4
 EOF
 
-sudo tee /mnt/umuos015/etc/TZ >/dev/null <<EOF
-$TZ_VALUE
+sudo tee /mnt/umuos015/etc/TZ >/dev/null <<'EOF'
+JST-9
 EOF
 
 sudo tee /mnt/umuos015/etc/securetty >/dev/null <<'EOF'
@@ -319,11 +313,11 @@ EOF
 sudo chown root:root /mnt/umuos015/umu_bin/ftpd_stop
 sudo chmod 0755 /mnt/umuos015/umu_bin/ftpd_stop
 
-sudo tee /mnt/umuos015/umu_bin/ntp_sync >/dev/null <<EOF
+sudo tee /mnt/umuos015/umu_bin/ntp_sync >/dev/null <<'EOF'
 #!/bin/sh
-ping -c 1 $DNS1 >/dev/null 2>&1 || exit 1
-ntpd -n -q -p $NTP_SERVER >/dev/null 2>&1 && exit 0
-ntpd -n -p $NTP_SERVER
+ping -c 1 8.8.8.8 >/dev/null 2>&1 || exit 1
+ntpd -n -q -p time.google.com >/dev/null 2>&1 && exit 0
+ntpd -n -p time.google.com
 EOF
 sudo chown root:root /mnt/umuos015/umu_bin/ntp_sync
 sudo chmod 0755 /mnt/umuos015/umu_bin/ntp_sync
@@ -345,28 +339,31 @@ chown root:root /umu_bin 2>/dev/null || true
 chmod 0755 /umu_bin 2>/dev/null || true
 
 (
-	UPTIME_S="$(cut -d' ' -f1 /proc/uptime 2>/dev/null || echo '?')"
-	BOOT_ID="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo '?')"
 	{
 		echo ""
-		echo "===== boot begin (boot_id=${BOOT_ID} uptime_s=${UPTIME_S}) ====="
+		echo "===== boot begin ====="
 		echo "[cmdline]"; cat /proc/cmdline 2>/dev/null || true
 		echo "[mount]"; mount 2>/dev/null || true
-		echo "[ip addr]"; ip addr 2>/dev/null || true
-		echo "[ip route]"; ip route 2>/dev/null || true
 		echo "===== boot end ====="
 	} >> /logs/boot.log
 ) 2>/dev/null || true
 
+# ネットワーク初期化（/etc/umu/network.conf をI/Fとする）
 (
 	CONF=/etc/umu/network.conf
-	[ -f "$CONF" ] && . "$CONF"
-	IFNAME="${IFNAME:-eth0}"
-	if [ "${MODE:-}" = "static" ] && [ -n "${IP:-}" ] && [ -n "${GW:-}" ]; then
-		ip link set dev "$IFNAME" up 2>/dev/null || true
-		ip addr add "$IP" dev "$IFNAME" 2>/dev/null || true
-		ip route replace default via "$GW" dev "$IFNAME" 2>/dev/null || true
-	fi
+	IFNAME="$(grep -m1 '^IFNAME=' "$CONF" 2>/dev/null | cut -d= -f2)"
+	MODE="$(grep -m1 '^MODE=' "$CONF" 2>/dev/null | cut -d= -f2)"
+	IP="$(grep -m1 '^IP=' "$CONF" 2>/dev/null | cut -d= -f2)"
+	GW="$(grep -m1 '^GW=' "$CONF" 2>/dev/null | cut -d= -f2)"
+
+	[ -n "$IFNAME" ] || IFNAME=eth0
+	[ "$MODE" = "static" ] || exit 0
+	[ -n "$IP" ] || exit 0
+	[ -n "$GW" ] || exit 0
+
+	ip link set dev "$IFNAME" up 2>/dev/null || true
+	ip addr add "$IP" dev "$IFNAME" 2>/dev/null || true
+	ip route replace default via "$GW" dev "$IFNAME" 2>/dev/null || true
 ) 2>/dev/null || true
 
 ( telnetd -p 23 -l /bin/login ) 2>/dev/null || true
@@ -391,7 +388,7 @@ sudo mkdir -p /mnt/umuos015/root
 sudo mkdir -p /mnt/umuos015/home/tama
 sudo chown 1000:1000 /mnt/umuos015/home/tama
 
-echo "[manual] next: generate password hashes, then edit /mnt/umuos015/etc/shadow"
+echo "[manual] next: generate password hashes, then paste into /mnt/umuos015/etc/shadow"
 ```
 
 ### 6.1 パスワード（手で貼る）
@@ -420,9 +417,9 @@ sudo chmod 600 /mnt/umuos015/etc/shadow
 ## 7. 自作 su（/umu_bin/su）
 
 ```bash
-cd "$W"
+cd /home/tama/umu/umu_project/UmuOS-0.1.5-dev
 
-cat > "$W/work/umu_su.c" <<'EOF'
+cat > /home/tama/umu/umu_project/UmuOS-0.1.5-dev/work/umu_su.c <<'EOF'
 #define _GNU_SOURCE
 
 #include <crypt.h>
@@ -523,13 +520,13 @@ int main(void) {
 }
 EOF
 
-cd "$W/work"
+cd /home/tama/umu/umu_project/UmuOS-0.1.5-dev/work
 gcc -static -Os -s -o umu_su umu_su.c -lcrypt || true
 if [ ! -f umu_su ]; then
 	gcc -static -Os -s -o umu_su umu_su.c -lxcrypt
 fi
 
-sudo cp -f "$W/work/umu_su" /mnt/umuos015/umu_bin/su
+sudo cp -f /home/tama/umu/umu_project/UmuOS-0.1.5-dev/work/umu_su /mnt/umuos015/umu_bin/su
 sudo chown root:root /mnt/umuos015/umu_bin/su
 sudo chmod 4755 /mnt/umuos015/umu_bin/su
 ```
@@ -548,9 +545,9 @@ sudo umount /mnt/umuos015
 ## 9. ISO（grub.cfg + grub-mkrescue）
 
 ```bash
-cd "$W"
+cd /home/tama/umu/umu_project/UmuOS-0.1.5-dev
 
-cat > "$W/iso_root/boot/grub/grub.cfg" <<EOF
+cat > /home/tama/umu/umu_project/UmuOS-0.1.5-dev/iso_root/boot/grub/grub.cfg <<'EOF'
 set timeout=20
 set default=0
 
@@ -561,19 +558,20 @@ terminal_output serial console
 menuentry "UmuOS-0.1.5-dev" {
 insmod gzio
 
-linux /boot/vmlinuz-$KVER \
-root=UUID=$DISK_UUID \
+linux /boot/vmlinuz-6.18.1 \
+root=UUID=d2c0b3c3-0b5e-4d24-8c91-09b3a4fb0c15 \
 rw \
 console=tty0 console=ttyS0,115200n8 \
 loglevel=7 \
 panic=-1 \
 net.ifnames=0 biosdevname=0
 
-initrd /boot/initrd.img-$KVER
+initrd /boot/initrd.img-6.18.1
 }
 EOF
 
-grub-mkrescue -o "$W/$ISO_NAME" "$W/iso_root"
+grub-mkrescue -o /home/tama/umu/umu_project/UmuOS-0.1.5-dev/UmuOS-0.1.5-boot.iso \
+	/home/tama/umu/umu_project/UmuOS-0.1.5-dev/iso_root
 ```
 
 ---
@@ -581,19 +579,19 @@ grub-mkrescue -o "$W/$ISO_NAME" "$W/iso_root"
 ## 10. Rocky 起動用（qemu.cmdline.txt）
 
 ```bash
-cd "$W"
+cd /home/tama/umu/umu_project/UmuOS-0.1.5-dev
 
-cat > "$W/run/qemu.cmdline.txt" <<EOF
+cat > /home/tama/umu/umu_project/UmuOS-0.1.5-dev/run/qemu.cmdline.txt <<'EOF'
 /usr/libexec/qemu-kvm \
 -enable-kvm -cpu host -m 1024 \
 -machine q35,accel=kvm \
 -nographic \
 -serial stdio \
--serial tcp:${TTY1_TCP},server,nowait,telnet \
+-serial tcp:127.0.0.1:5555,server,nowait,telnet \
 -drive file=./disk/disk.img,format=raw,if=virtio \
--cdrom ./$ISO_NAME \
+-cdrom ./UmuOS-0.1.5-boot.iso \
 -boot order=d \
--netdev tap,id=net0,ifname=$TAP_NAME,script=no,downscript=no \
+-netdev tap,id=net0,ifname=tap-umu,script=no,downscript=no \
 -device virtio-net-pci,netdev=net0 \
 -monitor none
 EOF
@@ -603,9 +601,9 @@ EOF
 
 ## 11. 異常時だけ見る（切り分けメモ）
 
-- kernel 成果物：`$W/kernel/build/arch/x86/boot/bzImage` が無い → `logs/kernel_build_*.log` を確認（途中で中断すると出ない）。
+- kernel 成果物：`/home/tama/umu/umu_project/UmuOS-0.1.5-dev/kernel/build/arch/x86/boot/bzImage` が無い → `logs/kernel_build_bzImage.log` を確認（途中で中断すると出ない）。
 - telnet の root だけ失敗：`/etc/securetty` を最優先。
-- DNS 失敗：`/etc/resolv.conf`、`ping -c 1 $DNS1`（L3）、`ping -c 1 google.com`（DNS）。
+- DNS 失敗：`/etc/resolv.conf`、`ping -c 1 8.8.8.8`（L3）、`ping -c 1 google.com`（DNS）。
 - NTP 失敗：DNS/外界疎通の前提と BusyBox に `ntpd` が入っているか。
 - `su` が `euid!=0`：disk.img 側の `chmod 4755` と、ゲスト側 `mount` の `nosuid` を確認。
 - FTP 接続不可：ゲストで `ps` と `/run/ftpd.pid`、BusyBox に `tcpsvd`/`ftpd` があるか。
