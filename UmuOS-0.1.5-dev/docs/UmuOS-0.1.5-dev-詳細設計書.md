@@ -61,8 +61,17 @@ sudo apt install -y \
 	openssl telnet netcat-openbsd
 
 # 自作 su の静的リンクで必要になる可能性（入らなくても後で対処できる）
+# `libxcrypt-dev` は環境によってはリポジトリ未有効で「見つからない」ことがある。
+# その場合でも手順は続行できるように、存在チェックしてから入れる。
 sudo apt install -y libcrypt-dev || true
-sudo apt install -y libxcrypt-dev || true
+
+# もし `libxcrypt-dev` が見つからない場合は `universe` が無効な可能性がある。
+# ただし必須ではないので、下は全部失敗しても続行する。
+sudo apt install -y software-properties-common || true
+sudo add-apt-repository -y universe || true
+sudo apt update || true
+
+apt-cache show libxcrypt-dev >/dev/null 2>&1 && sudo apt install -y libxcrypt-dev || true
 ```
 
 ---
@@ -122,9 +131,10 @@ make -C /home/tama/umu/umu_project/external/linux-6.18.1-kernel \
   O=/home/tama/umu/umu_project/UmuOS-0.1.5-dev/kernel/build olddefconfig
 
 # ビルドログは固定名で上書き（追いかけやすさ優先）
-( make -C /home/tama/umu/umu_project/external/linux-6.18.1-kernel \
-    O=/home/tama/umu/umu_project/UmuOS-0.1.5-dev/kernel/build -j4 bzImage \
-  ) > /home/tama/umu/umu_project/UmuOS-0.1.5-dev/logs/kernel_build_bzImage.log 2>&1
+# 画面にも進捗が出るように `tee` を使う（TeraTerm で「止まって見える」を回避）
+make -C /home/tama/umu/umu_project/external/linux-6.18.1-kernel \
+	O=/home/tama/umu/umu_project/UmuOS-0.1.5-dev/kernel/build -j4 bzImage \
+	2>&1 | tee /home/tama/umu/umu_project/UmuOS-0.1.5-dev/logs/kernel_build_bzImage.log
 
 mkdir -p /home/tama/umu/umu_project/UmuOS-0.1.5-dev/iso_root/boot
 cp -f /home/tama/umu/umu_project/UmuOS-0.1.5-dev/kernel/build/arch/x86/boot/bzImage \
@@ -168,12 +178,34 @@ CONFIG_NSLOOKUP=y
 CONFIG_NTPD=y
 CONFIG_TCPSVD=y
 CONFIG_FTPD=y
+
+# `tc` は環境のカーネルヘッダ差分でビルドが落ちることがあるため明示的に無効化
+# CONFIG_TC is not set
+# CONFIG_FEATURE_TC_INGRESS is not set
 EOF
 
 yes "" | make oldconfig
+
+# 成立確認（TeraTerm コピペ向け：1行でも欠けたら以降は失敗しやすい）
+egrep -n '^(CONFIG_STATIC=y|# CONFIG_TC is not set|# CONFIG_FEATURE_TC_INGRESS is not set)$' .config
+
+# もし CONFIG_TC=y や「# CONFIG_STATIC is not set」に戻っていたら強制的に直してから oldconfig し直す
+if egrep -q '^(# CONFIG_STATIC is not set|CONFIG_TC=y|CONFIG_FEATURE_TC_INGRESS=y)$' .config; then
+	sed -i \
+		-e 's/^# CONFIG_STATIC is not set$/CONFIG_STATIC=y/' \
+		-e 's/^CONFIG_TC=y$/# CONFIG_TC is not set/' \
+		-e 's/^CONFIG_FEATURE_TC_INGRESS=y$/# CONFIG_FEATURE_TC_INGRESS is not set/' \
+		.config
+	yes "" | make oldconfig
+fi
 cp -f .config /home/tama/umu/umu_project/UmuOS-0.1.5-dev/initramfs/busybox/config-1.36.1
 
-( make -j4 ) > /home/tama/umu/umu_project/UmuOS-0.1.5-dev/logs/busybox_build.log 2>&1
+# 画面にも進捗が出るように `tee` を使う（TeraTerm で「止まって見える」を回避）
+make -j4 2>&1 | tee /home/tama/umu/umu_project/UmuOS-0.1.5-dev/logs/busybox_build.log
+
+# 成果物確認（Step5 の cp が失敗しないように、ここで実体を確認する）
+ls -l busybox
+file busybox
 ```
 
 ---
@@ -277,6 +309,12 @@ pts/8
 pts/9
 EOF
 
+# PATH は rcS の export だけだとログインシェルに反映されないことがあるため、/etc/profile 側でも固定する
+sudo tee /mnt/umuos015/etc/profile >/dev/null <<'EOF'
+export PATH=/umu_bin:/sbin:/bin
+export TZ=JST-9
+EOF
+
 sudo chown root:root /mnt/umuos015/umu_bin
 sudo chmod 0755 /mnt/umuos015/umu_bin
 
@@ -296,7 +334,8 @@ if [ -f /run/ftpd.pid ] && kill -0 "$(cat /run/ftpd.pid)" 2>/dev/null; then
 	exit 0
 fi
 
-busybox tcpsvd -vE 0.0.0.0 21 busybox ftpd /tmp &
+# FTP の公開ルート（ここを / にすると全ディレクトリが見える）
+busybox tcpsvd -vE 0.0.0.0 21 busybox ftpd / &
 echo $! > /run/ftpd.pid
 EOF
 sudo chown root:root /mnt/umuos015/umu_bin/ftpd_start
@@ -326,6 +365,7 @@ sudo tee /mnt/umuos015/etc/init.d/rcS >/dev/null <<'EOF'
 #!/bin/sh
 
 export PATH=/umu_bin:/sbin:/bin
+export TZ=JST-9
 
 mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sysfs /sys 2>/dev/null || true
@@ -342,6 +382,9 @@ chmod 0755 /umu_bin 2>/dev/null || true
 	{
 		echo ""
 		echo "===== boot begin ====="
+		echo "[boot_id]"; cat /proc/sys/kernel/random/boot_id 2>/dev/null || true
+		echo "[time]"; date -R 2>/dev/null || date 2>/dev/null || true
+		echo "[uptime]"; cat /proc/uptime 2>/dev/null || true
 		echo "[cmdline]"; cat /proc/cmdline 2>/dev/null || true
 		echo "[mount]"; mount 2>/dev/null || true
 		echo "===== boot end ====="
@@ -364,6 +407,13 @@ chmod 0755 /umu_bin 2>/dev/null || true
 	ip link set dev "$IFNAME" up 2>/dev/null || true
 	ip addr add "$IP" dev "$IFNAME" 2>/dev/null || true
 	ip route replace default via "$GW" dev "$IFNAME" 2>/dev/null || true
+) 2>/dev/null || true
+
+# 時刻同期（ネットワーク初期化後に1回だけ）
+(
+	echo "[ntp_sync] before: $(date -R 2>/dev/null || date)" >> /logs/boot.log
+	/umu_bin/ntp_sync >> /logs/boot.log 2>&1 || true
+	echo "[ntp_sync] after : $(date -R 2>/dev/null || date)" >> /logs/boot.log
 ) 2>/dev/null || true
 
 ( telnetd -p 23 -l /bin/login ) 2>/dev/null || true
@@ -451,7 +501,7 @@ static int read_shadow_hash_root(char *out, size_t out_len) {
 		if (!q) {
 			break;
 		}
-		*q = '\\0';
+		*q = '\0';
 
 		if (strlen(p) == 0 || strcmp(p, "!") == 0 || strcmp(p, "*") == 0) {
 			fprintf(stderr, "su: root password is locked/empty in /etc/shadow\\n");
@@ -466,7 +516,7 @@ static int read_shadow_hash_root(char *out, size_t out_len) {
 		}
 
 		strncpy(out, p, out_len);
-		out[out_len - 1] = '\\0';
+		out[out_len - 1] = '\0';
 		fclose(fp);
 		return 0;
 	}
@@ -536,8 +586,24 @@ sudo chmod 4755 /mnt/umuos015/umu_bin/su
 ## 8. アンマウント
 
 ```bash
+# /mnt/umuos015 配下にいると umount が busy で失敗するので、必ず外へ出る
+cd ..
 sync
 sudo umount /mnt/umuos015
+```
+
+---
+
+## 8.1 既存 disk.img に差分反映（rcS だけ差し替え）
+
+すでに作成済みの `disk.img` を「作り直さずに」、`/etc/init.d/rcS` だけを設計書最新版へ差し替える。
+
+```bash
+cd /home/tama/umu/umu_project/UmuOS-0.1.5-dev
+
+# rcS を差し替える（自動で mount/backup/umount する）
+sudo bash ./tools/patch_diskimg_rcS.sh /home/tama/umu/umu_project/UmuOS-0.1.5-dev/disk/disk.img
+# backup は disk.img 内の /etc/init.d/rcS.bak.YYYYmmdd_HHMMSS として残る
 ```
 
 ---
@@ -599,7 +665,166 @@ EOF
 
 ---
 
+## 10.1 起動スクリプト（UmuOS-0.1.5-dev_start.sh）
+
+Rocky 側は `/root` に次の 3 ファイルだけ置けば起動できる（`run/qemu.cmdline.txt` は不要）。
+
+- `UmuOS-0.1.5-boot.iso`
+- `disk.img`
+- `UmuOS-0.1.5-dev_start.sh`
+
+```bash
+cd /home/tama/umu/umu_project/UmuOS-0.1.5-dev
+
+cat > /home/tama/umu/umu_project/UmuOS-0.1.5-dev/UmuOS-0.1.5-dev_start.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ISO_FILE="${BASE_DIR}/UmuOS-0.1.5-boot.iso"
+DISK_FILE="${BASE_DIR}/disk.img"
+
+TTYS1_PORT="${TTYS1_PORT:-5555}"
+TAP_IF="${TAP_IF:-tap-umu}"
+BRIDGE="${BRIDGE:-br0}"
+NET_MODE="${NET_MODE:-tap}"
+
+say() { echo "[UmuOS-0.1.5-dev_start] $*"; }
+die() { echo "[UmuOS-0.1.5-dev_start] ERROR: $*" >&2; exit 1; }
+
+[[ -f "${ISO_FILE}" ]] || die "file not found: ${ISO_FILE}"
+[[ -f "${DISK_FILE}" ]] || die "file not found: ${DISK_FILE}"
+
+need_cmd() { command -v "$1" >/dev/null 2>&1 || die "missing command: $1"; }
+find_qemu() {
+	if [[ -x /usr/libexec/qemu-kvm ]]; then
+		echo /usr/libexec/qemu-kvm
+		return 0
+	fi
+	if command -v qemu-kvm >/dev/null 2>&1; then
+		command -v qemu-kvm
+		return 0
+	fi
+	if command -v qemu-system-x86_64 >/dev/null 2>&1; then
+		command -v qemu-system-x86_64
+		return 0
+	fi
+	return 1
+}
+
+if [[ ${EUID} -ne 0 ]]; then
+	say "This script usually needs root (KVM/TAP). Re-running via sudo..."
+	exec sudo -E "${BASH_SOURCE[0]}" "$@"
+fi
+
+if [[ ! -e /dev/kvm ]]; then
+	say "NOTE: /dev/kvm not found. KVM acceleration may be unavailable."
+fi
+
+need_cmd ip
+need_cmd script
+
+QEMU_BIN="$(find_qemu)" || die "qemu binary not found (/usr/libexec/qemu-kvm or qemu-kvm or qemu-system-x86_64)"
+
+if [[ "${NET_MODE}" == "tap" ]]; then
+	if ! ip link show "${BRIDGE}" >/dev/null 2>&1; then
+		die "bridge '${BRIDGE}' not found (create it or set BRIDGE=...; or set NET_MODE=none to boot without networking)"
+	fi
+
+	if ! ip link show "${TAP_IF}" >/dev/null 2>&1; then
+		ip link del dev "${TAP_IF}" >/dev/null 2>&1 || true
+		ip tuntap add dev "${TAP_IF}" mode tap
+		ip link set dev "${TAP_IF}" master "${BRIDGE}"
+		ip link set dev "${TAP_IF}" up
+		say "created tap '${TAP_IF}' and attached to '${BRIDGE}'"
+	else
+		ip link set dev "${TAP_IF}" master "${BRIDGE}" >/dev/null 2>&1 || true
+		ip link set dev "${TAP_IF}" up >/dev/null 2>&1 || true
+	fi
+elif [[ "${NET_MODE}" == "none" ]]; then
+	:
+else
+	die "invalid NET_MODE='${NET_MODE}' (expected: tap|none)"
+fi
+
+TS="$(date +%Y%m%d_%H%M%S)"
+LOG_FILE="${BASE_DIR}/host_qemu.console_${TS}.log"
+
+say "qemu: ${QEMU_BIN}"
+say "log: ${LOG_FILE}"
+say "iso: ${ISO_FILE}"
+say "disk: ${DISK_FILE}"
+say "net: ${NET_MODE}"
+if [[ "${NET_MODE}" == "tap" ]]; then
+	say "tap: ${TAP_IF} (bridge: ${BRIDGE})"
+fi
+
+QEMU_CMD=(
+	"${QEMU_BIN}"
+	-enable-kvm -cpu host -m 1024
+	-machine q35,accel=kvm
+	-nographic
+	-serial stdio
+	-serial "tcp:127.0.0.1:${TTYS1_PORT},server,nowait,telnet"
+	-drive "file=${DISK_FILE},format=raw,if=virtio"
+	-cdrom "${ISO_FILE}"
+	-boot order=d
+	-monitor none
+)
+
+if [[ "${NET_MODE}" == "tap" ]]; then
+	QEMU_CMD+=(
+		-netdev "tap,id=net0,ifname=${TAP_IF},script=no,downscript=no"
+		-device virtio-net-pci,netdev=net0
+	)
+fi
+
+CMD_STR="$(printf '%q ' "${QEMU_CMD[@]}")"
+exec script -q -f -c "${CMD_STR}" "${LOG_FILE}"
+EOF
+
+chmod +x /home/tama/umu/umu_project/UmuOS-0.1.5-dev/UmuOS-0.1.5-dev_start.sh
+```
+
+起動（Rocky 側、基本は root 実行）：
+
+```bash
+cd /root
+sudo ./UmuOS-0.1.5-dev_start.sh
+```
+
+ファイアーウォール（Rockyの5000番ポートを利用するfirewall変更する）
+5000番ポート開ける
+受信側　nc -4 -l 5000 > UmuOS-0.1.5-boot.iso　で待ち受け
+送信側　nc -4 192.168.0.200 5000 < UmuOS-0.1.5-boot.iso
+
+
+
+
+
+
+---
+
 ## 11. 異常時だけ見る（切り分けメモ）
+
+### Rocky へ転送（nc メモ / 任意）
+
+```bash
+# Rocky（受信側の例）
+cd /root
+
+# firewalld を使っている場合は 5000/tcp を許可（不要ならスキップ）
+sudo firewall-cmd --add-port=5000/tcp --permanent || true
+sudo firewall-cmd --reload || true
+
+# 受信（nc の実装により -l/-p の指定が異なる場合がある）
+nc -4 -l 5000 > UmuOS-0.1.5-boot.iso
+```
+
+```bash
+# Ubuntu（送信側の例）
+nc -4 192.168.0.200 5000 < UmuOS-0.1.5-boot.iso
+```
 
 - kernel 成果物：`/home/tama/umu/umu_project/UmuOS-0.1.5-dev/kernel/build/arch/x86/boot/bzImage` が無い → `logs/kernel_build_bzImage.log` を確認（途中で中断すると出ない）。
 - telnet の root だけ失敗：`/etc/securetty` を最優先。
