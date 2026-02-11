@@ -3,12 +3,7 @@
 # ============================
 
 # カーネルソース（展開後のディレクトリ）
-step1/kernel/linux-*/
-step2/kernel/linux-*/
-step3/kernel/linux-*/
-step4/kernel/linux-*/
-UmuOSver01/kernel/linux-*/
-UmuOSver011/kernel/linux-*/
+
 UmuOS-0.1.1/kernel/linux-*/
 UmuOS-0.1.2/kernel/linux-*/
 UmuOS-0.1.3/kernel/linux-*/
@@ -17,12 +12,7 @@ UmuOS-0.1.4-base-stable/kernel/linux-*/
 UmuOS-0.1.5-dev/kernel/linux-*/
 
 # カーネルアーカイブ
-step1/kernel/*.tar.xz
-step2/kernel/*.tar.xz
-step3/kernel/*.tar.xz
-step4/kernel/*.tar.xz
-UmuOSver01/kernel/*.tar.xz
-UmuOSver011/kernel/*.tar.xz
+
 UmuOS-0.1.1/kernel/*.tar.xz
 UmuOS-0.1.2/kernel/*.tar.xz
 UmuOS-0.1.3/kernel/*.tar.xz
@@ -34,24 +24,7 @@ UmuOS-0.1.5-dev/kernel/*.tar.xz
 UmuOS-0.1.5-dev/kernel/build/
 
 # initramfs 関連の一時ファイル
-step1/initramfs/modules/
-step1/initramfs/extracted/
-step1/initramfs/*.img
-step2/initramfs/modules/
-step2/initramfs/extracted/
-step2/initramfs/*.img
-step3/initramfs/modules/
-step3/initramfs/extracted/
-step3/initramfs/*.img
-step4/initramfs/modules/
-step4/initramfs/extracted/
-step4/initramfs/*.img
-UmuOSver01/initramfs/modules/
-UmuOSver01/initramfs/extracted/
-UmuOSver01/initramfs/*.img
-UmuOSver011/initramfs/modules/
-UmuOSver011/initramfs/extracted/
-UmuOSver011/initramfs/*.img
+
 UmuOS-0.1.1/initramfs/modules/
 UmuOS-0.1.1/initramfs/extracted/
 UmuOS-0.1.1/initramfs/*.img
@@ -74,12 +47,7 @@ UmuOS-0.1.5-dev/initramfs/*.img
 
 
 # initramfs の生成物（拡張子 .img で終わらないため、*.img では拾えない）
-step1/initramfs/initrd.img-*
-step2/initramfs/initrd.img-*
-step3/initramfs/initrd.img-*
-step4/initramfs/initrd.img-*
-UmuOSver01/initramfs/initrd.img-*
-UmuOSver011/initramfs/initrd.img-*
+
 UmuOS-0.1.1/initramfs/initrd.img-*
 UmuOS-0.1.2/initramfs/initrd.img-*
 UmuOS-0.1.3/initramfs/initrd.img-*
@@ -104,11 +72,7 @@ UmuOS-0.1.5-dev/initramfs/initrd.list
 UmuOS-0.1.5-dev/initramfs/rootfs/
 
 # initramfs 関連の一時ファイル（rootfs 内の bin ディレクトリ）
-step2/initramfs/rootfs/bin/*
-step3/initramfs/rootfs/bin/*
-step4/initramfs/rootfs/bin/*
-UmuOSver01/initramfs/rootfs/bin/*
-UmuOSver011/initramfs/rootfs/bin/*
+
 UmuOS-0.1.1/initramfs/rootfs/bin/*
 UmuOS-0.1.2/initramfs/rootfs/bin/*
 UmuOS-0.1.3/initramfs/rootfs/bin/*
@@ -119,8 +83,7 @@ UmuOS-0.1.4-base-stable/initramfs/rootfs/sbin/*
 
 
 # initramfs のビルド成果物（PID1バイナリなど）
-UmuOSver01/initramfs/rootfs/init
-UmuOSver011/initramfs/rootfs/init
+
 UmuOS-0.1.1/initramfs/rootfs/init
 UmuOS-0.1.2/initramfs/rootfs/init
 UmuOS-0.1.3/initramfs/rootfs/init
@@ -132,18 +95,7 @@ UmuOS-0.1.5-dev/initramfs/rootfs/init
 UmuOS-0.1.5-dev/initramfs/busybox/work/
 
 # ISO イメージ
-step1/*.iso
-step1/OVMF_VARS_custom.fd
-step2/*.iso
-step2/OVMF_VARS_custom.fd
-step3/*.iso
-step3/OVMF_VARS_custom.fd
-step4/*.iso
-step4/OVMF_VARS_custom.fd
-UmuOSver01/*.iso
-UmuOSver01/OVMF_VARS_custom.fd
-UmuOSver011/*.iso
-UmuOSver011/OVMF_VARS_custom.fd
+
 UmuOS-0.1.1/*.iso
 UmuOS-0.1.1/OVMF_VARS_custom.fd
 UmuOS-0.1.2/*.iso
@@ -167,12 +119,7 @@ UmuOS-0.1.5-dev/run/OVMF_VARS_*.fd
 
 
 # ログファイル
-step1/logs/*.log
-step2/logs/*.log
-step3/logs/*.log
-step4/logs/*.log
-UmuOSver01/logs/*.log
-UmuOSver011/logs/*.log
+
 UmuOS-0.1.1/logs/*.log
 UmuOS-0.1.2/logs/*.log
 UmuOS-0.1.3/logs/*.log
@@ -181,18 +128,7 @@ UmuOS-0.1.4-base-stable/logs/*.log
 UmuOS-0.1.5-dev/logs/*.log
 
 # ビルド成果物（iso_root 内）
-step1/iso_root/boot/vmlinuz-*
-step1/iso_root/boot/initrd.img-*
-step2/iso_root/boot/vmlinuz-*
-step2/iso_root/boot/initrd.img-*
-step3/iso_root/boot/vmlinuz-*
-step3/iso_root/boot/initrd.img-*
-step4/iso_root/boot/vmlinuz-*
-step4/iso_root/boot/initrd.img-*
-UmuOSver01/iso_root/boot/vmlinuz-*
-UmuOSver01/iso_root/boot/initrd.img-*
-UmuOSver011/iso_root/boot/vmlinuz-*
-UmuOSver011/iso_root/boot/initrd.img-*
+
 UmuOS-0.1.1/iso_root/boot/vmlinuz-*
 UmuOS-0.1.1/iso_root/boot/initrd.img-*
 UmuOS-0.1.1/iso_root/boot/config-*
@@ -217,8 +153,7 @@ UmuOS-0.1.5-dev/iso_root/boot/config-*
 
 
 # 永続ストレージ（ext4イメージ）
-UmuOSver01/disk/*.img
-UmuOSver011/disk/*.img
+
 UmuOS-0.1.1/disk/*.img
 UmuOS-0.1.2/disk/*.img
 UmuOS-0.1.3/disk/*.img
@@ -231,8 +166,7 @@ UmuOS-0.1.5-dev/disk/*.img
 *.swp
 *.swo
 .DS_Store
-UmuOSver01/initramfs/rootfs/etc/shadow
-UmuOSver011/initramfs/rootfs/etc/shadow
+
 UmuOS-0.1.1/initramfs/rootfs/etc/shadow
 UmuOS-0.1.2/initramfs/rootfs/etc/shadow
 UmuOS-0.1.3/initramfs/rootfs/etc/shadow
