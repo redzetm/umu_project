@@ -15,6 +15,35 @@ status: clean-reproducible-manual
 - `PATH/TZ/NTP/FTP公開ルート` は disk.img 側に統合し、起動のたびに同じ動きをする。
 - Rocky 側は `/root` に **ISO + disk.img + start.sh の3つだけ**で起動できる形にする。
 
+この文書は「ブロック単位でコピペしていけば完走できる」粒度を目標にしている。
+ただし **環境依存（KVM可否・ブリッジ有無・パッケージ名差）** はゼロにできないため、事前チェックを必ず通す。
+
+設計思想：UmuOS は「使うためのOS」ではなく「理解するためのOS」である。
+したがって各ステップの **観測点** は「成功/失敗」の判定だけでなく、どの層（bootloader/kernel/initramfs/rootfs/userspace）が支配しているかを切り分けるために置く。
+
+### 0.0 事前チェック（ここだけ最初に実行）
+
+観測点：ここで詰まるなら、以降のコピペは高確率で失敗する。
+理解の狙い：実装手順に入る前に「ホストの前提条件」を確定し、失敗原因をOS側に寄せて観測できる状態にする。
+
+```bash
+set -e
+
+# ツールの存在（インストール済みの確認）
+command -v make gcc >/dev/null
+command -v grub-mkrescue xorriso mformat mcopy >/dev/null
+command -v cpio gzip mkfs.ext4 mount umount >/dev/null
+
+# QEMU（起動ホストで起動する場合のみ必要。Rocky/Ubuntuどちらでも）
+command -v qemu-system-x86_64 >/dev/null || command -v qemu-kvm >/dev/null
+
+# KVM（使えると高速。無い場合は起動が極端に遅い/失敗しうる）
+test -e /dev/kvm || echo "WARN: /dev/kvm が無い（KVM無しでの起動は非推奨）"
+
+# ディスク空き（目安。kernel+busybox+ISO+disk.imgで数GB）
+df -h /home || true
+```
+
 ---
 
 ## 0. 固定値（読むだけ / コマンドに直書き）
@@ -49,6 +78,7 @@ status: clean-reproducible-manual
 ## 1. Ubuntu 事前準備（パッケージ）
 
 観測点：`netcat-openbsd` を入れておく（転送/切り分け用）。
+理解の狙い：観測・転送の道具を最小セットで固定し、環境差分によるブレを減らす。
 
 ```bash
 sudo apt update
@@ -76,6 +106,7 @@ apt-cache show libxcrypt-dev >/dev/null 2>&1 && sudo apt install -y libxcrypt-de
 ## 2. 作業ディレクトリ（初期化）
 
 観測点：外部ソース（kernel/busybox）が存在する。
+理解の狙い：成果物（kernel/busybox/ISO/disk.img）の依存関係を「パスの固定」で見える化する。
 
 ```bash
 mkdir -p /home/tama/umu_project/UmuOS-0.1.6-dev
@@ -100,6 +131,7 @@ test -f /home/tama/umu_project/external/busybox-1.36.1/Makefile
 ### 2.1.1 rcSテンプレ（唯一の正）
 
 観測点：`/logs/boot.log` に `boot_id/time/uptime` が追記される。
+理解の狙い：`init` → `inittab` → `rcS` のユーザーランド初期化が実際に走っていることを、永続ログで観測する。
 
 ```bash
 cat > /home/tama/umu_project/UmuOS-0.1.6-dev/tools/rcS_umuos016.sh <<'EOF'
@@ -257,6 +289,7 @@ chmod +x /home/tama/umu_project/UmuOS-0.1.6-dev/tools/patch_diskimg_rcS.sh
 ### 2.1.3 Rocky起動スクリプト（/rootに3ファイルだけ）
 
 観測点：`ifname=` のtypoを絶対に入れない（以前の事故ポイント）。
+理解の狙い：ネットワークが壊れたとき「ゲストの設定」ではなく「ホストの起動引数ミス」という層の切り分けを最初に潰す。
 
 ```bash
 cat > /home/tama/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-dev_start.sh <<'EOF'
@@ -357,6 +390,7 @@ chmod +x /home/tama/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-dev_start.sh
 ## 3. Kernel（out-of-tree）
 
 観測点：ビルドが途中で止まっていないこと（ログにエラーが無い）。
+理解の狙い：カーネルは全レイヤの土台なので、失敗を最初に除去して以降の観測を userspace 側に集中させる。
 
 ```bash
 cd /home/tama/umu_project/UmuOS-0.1.6-dev
@@ -408,6 +442,7 @@ test -f /home/tama/umu_project/UmuOS-0.1.6-dev/iso_root/boot/vmlinuz-6.18.1
 ## 4. BusyBox（静的リンク、対話なし）
 
 観測点：`busybox` が static で、`ntpd/tcpsvd/ftpd` が有効。
+理解の狙い：UmuOSのユーザーランド機能は BusyBox の設定で成立する（=「何が入っているか」を自分で把握して観測できる）ことを確認する。
 
 ```bash
 cd /home/tama/umu_project/UmuOS-0.1.6-dev
@@ -430,6 +465,8 @@ CONFIG_SWITCH_ROOT=y
 CONFIG_TELNETD=y
 CONFIG_FEATURE_TELNETD_STANDALONE=y
 CONFIG_LOGIN=y
+# /etc/shadow を使う（ここが無いと login/su 周りの挙動が環境差になりやすい）
+CONFIG_FEATURE_SHADOWPASSWDS=y
 CONFIG_IP=y
 CONFIG_NC=y
 
@@ -469,6 +506,7 @@ file busybox
 ## 5. initramfs（initrd.img-6.18.1）
 
 観測点：`initrd.img-6.18.1` が `iso_root/boot/` にコピーされている。
+理解の狙い：GRUB → kernel → initrd の“つなぎ目”はファイル配置で決まるため、成果物の存在を物で確認する。
 
 ```bash
 cd /home/tama/umu_project/UmuOS-0.1.6-dev
@@ -509,6 +547,7 @@ test -f /home/tama/umu_project/UmuOS-0.1.6-dev/iso_root/boot/initrd.img-6.18.1
 ## 6. disk.img（永続 rootfs）
 
 観測点：`/etc/profile` で `PATH` と `TZ` が固定され、`rcS` がテンプレ版になっている。
+理解の狙い：`switch_root` 後の永続 rootfs が「毎回の起動挙動」を決めることを観測する（initramfs と責務を分離）。
 
 ```bash
 cd /home/tama/umu_project/UmuOS-0.1.6-dev
@@ -644,6 +683,7 @@ sudo install -m 0755 /home/tama/umu_project/UmuOS-0.1.6-dev/tools/rcS_umuos016.s
 ### 6.1 パスワード（手で貼る）
 
 観測点：このブロックだけは手入力が必要（ハッシュ）。
+理解の狙い：認証は /etc/shadow の内容に直結する（=成果物へ埋め込むデータ）ため、手作業箇所を明示して再現の揺れをここに隔離する。
 
 ```bash
 openssl passwd -6
@@ -665,6 +705,7 @@ sudo chmod 600 /mnt/umuos016/etc/shadow
 ## 7. 自作 su（/umu_bin/su）
 
 観測点：`chmod 4755` を必ず通す（root切替の成立条件）。
+理解の狙い：setuid による euid 変化（権限昇格の成立条件）を自作実装で観測できるようにする。
 
 ```bash
 cd /home/tama/umu_project/UmuOS-0.1.6-dev
@@ -770,6 +811,7 @@ sudo chmod 4755 /mnt/umuos016/umu_bin/su
 ## 8. アンマウント
 
 観測点：`/mnt/umuos016` 配下にいない状態で実行する（busy回避）。
+理解の狙い：ホストの loop mount は「ファイル=ディスク」を扱う基本なので、状態管理（busy/umount）がどう失敗するかを体験しつつ避ける。
 
 ```bash
 cd /
@@ -782,6 +824,7 @@ sudo umount /mnt/umuos016
 ## 9. ISO（grub.cfg + grub-mkrescue）
 
 観測点：ISOが生成され、ファイルサイズが0でない。
+理解の狙い：ブートの入口（GRUB設定+kernel引数+initrd指定）が「ISOという1ファイル」に閉じることを確認する。
 
 ```bash
 cd /home/tama/umu_project/UmuOS-0.1.6-dev
@@ -819,11 +862,62 @@ ls -l /home/tama/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-boot.iso
 
 ## 10. Rocky 起動（/rootに3ファイルだけ）
 
+この章は Rocky を例に書くが、起動スクリプトは **QEMU/KVM が使えるホスト**であれば同様に動く。
+
+- `NET_MODE=tap`：ブリッジ `br0` が存在すること（無い環境では失敗する）
+- `NET_MODE=none`：ブリッジ無しでも起動できる（ネット機能の検証はできない）
+
 Rocky の `/root` に置く：
 
 - `UmuOS-0.1.6-boot.iso`
 - `disk.img`（Ubuntuで作った `disk/disk.img` を `disk.img` にして置く）
 - `UmuOS-0.1.6-dev_start.sh`
+
+### 10.0 Rocky へ 3ファイルを転送（例）
+
+観測点：Rocky の `/root` に **3ファイルが揃っている**。
+理解の狙い：「OSと開発環境の分離」を守り、実行環境に持ち込む最小単位を固定する。
+
+この文書の標準は `nc`（netcat）で転送する（SSH/鍵/権限で詰まらないようにするため）。
+ここは **1ポートで順番に送る**（端末を増やさない）。
+`ROCKY_HOST` は自分の環境に合わせて置き換える。
+
+事前（Rocky側）：
+
+```bash
+command -v nc >/dev/null || sudo dnf install -y nmap-ncat
+
+# 受信用ポートを開ける（環境によって不要）
+sudo firewall-cmd --add-port=12345/tcp --permanent || true
+sudo firewall-cmd --reload || true
+```
+
+```bash
+# Rocky（受信側）
+cd /root
+
+# 1本ずつ受ける（受信コマンドを叩く→送信→完了したら次へ）
+nc -4 -l 12345 > UmuOS-0.1.6-boot.iso
+nc -4 -l 12345 > disk.img
+nc -4 -l 12345 > UmuOS-0.1.6-dev_start.sh
+```
+
+```bash
+# Ubuntu（送信側）
+cd /home/tama/umu_project/UmuOS-0.1.6-dev
+
+ROCKY_HOST=192.168.0.200
+
+nc -4 ${ROCKY_HOST} 12345 < UmuOS-0.1.6-boot.iso
+nc -4 ${ROCKY_HOST} 12345 < disk/disk.img
+nc -4 ${ROCKY_HOST} 12345 < UmuOS-0.1.6-dev_start.sh
+```
+
+```bash
+# Rocky（受信側）
+cd /root
+ls -l UmuOS-0.1.6-boot.iso disk.img UmuOS-0.1.6-dev_start.sh
+```
 
 起動：
 
@@ -831,6 +925,27 @@ Rocky の `/root` に置く：
 cd /root
 sudo ./UmuOS-0.1.6-dev_start.sh
 ```
+
+### 10.1 Tera Term 接続（ttyS1）
+
+目的：ゲストの `ttyS1` を **TCP で取っている** ので、Tera Term から観測/操作できる。
+
+- 接続先：`127.0.0.1`
+- ポート：`5555`
+- プロトコル：`Telnet`
+
+CLI で代替する場合（Rocky側）：
+
+```bash
+telnet 127.0.0.1 5555
+```
+
+ログイン後の観測点：
+
+理解の狙い：シリアル経由の getty/login の経路が成立していることを確認し、以降の観測（ネット/rcS/log）が Tera Term だけで完結できるようにする。
+
+- `login:` が出る（`/etc/inittab` の `ttyS1::respawn:/sbin/getty ...`）
+- `root` / `tama` のどちらでもログインできる（`/etc/passwd` と `/etc/shadow`）
 
 ネット無し起動（切り分け用）：
 
@@ -850,6 +965,21 @@ sudo NET_MODE=none ./UmuOS-0.1.6-dev_start.sh
 - `date` がJSTで出る（NTPが通れば時刻も合う）
 - FTP が起動している（`/run/ftpd.pid` がある）
 
+Tera Term でそのまま貼れる確認コマンド：
+
+```sh
+echo "[whoami]"; whoami
+echo "[PATH]"; echo "$PATH"
+echo "[TZ]"; cat /etc/TZ 2>/dev/null || true
+echo "[date]"; date -R 2>/dev/null || date
+
+echo "[boot.log tail]"; tail -n 80 /logs/boot.log 2>/dev/null || true
+
+echo "[telnetd]"; ps w | grep -E 'telnetd|\[telnetd\]' | grep -v grep || true
+echo "[ftpd pid]"; ls -l /run/ftpd.pid 2>/dev/null || true
+echo "[ftpd ps]"; ps w | grep -E 'tcpsvd|ftpd|\[tcpsvd\]|\[ftpd\]' | grep -v grep || true
+```
+
 ---
 
 ## 12. 異常時だけ見る（切り分けメモ）
@@ -861,15 +991,4 @@ sudo NET_MODE=none ./UmuOS-0.1.6-dev_start.sh
 
 ### Rocky へ転送（nc メモ / 任意・統一ポート12345）
 
-```bash
-# Rocky（受信側）
-cd /root
-sudo firewall-cmd --add-port=12345/tcp --permanent || true
-sudo firewall-cmd --reload || true
-nc -4 -l 12345 > UmuOS-0.1.6-boot.iso
-```
-
-```bash
-# Ubuntu（送信側）
-nc -4 192.168.0.200 12345 < /home/tama/umu_project/UmuOS-0.1.6-dev/UmuOS-0.1.6-boot.iso
-```
+転送は 10章の `nc` 手順を使う（ISO/disk.img/start.sh の3本を揃える）。
