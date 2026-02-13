@@ -16,7 +16,9 @@ status: clean-reproducible-manual
 - Rocky 側は `/root` に **ISO + disk.img + start.sh の3つだけ**で起動できる形にする。
 
 この文書は「ブロック単位でコピペしていけば完走できる」粒度を目標にしている。
-ただし **環境依存（KVM可否・ブリッジ有無・パッケージ名差）** はゼロにできないため、事前チェックを必ず通す。
+しかし、このOSは研究用OSなので、意味を分かってコピペしていただきたい気持ちです。
+
+**環境依存（KVM可否・ブリッジ有無・パッケージ名差）** はゼロにできないため、事前チェックを必ず通す。
 
 設計思想：UmuOS は「使うためのOS」ではなく「理解するためのOS」である。
 したがって各ステップの **観測点** は「成功/失敗」の判定だけでなく、どの層（bootloader/kernel/initramfs/rootfs/userspace）が支配しているかを切り分けるために置く。
@@ -46,7 +48,7 @@ df -h /home || true
 
 ---
 
-## 0. 固定値（読むだけ / コマンドに直書き）
+## 0. 固定値（読むだけでOK / コマンドに直書き）
 
 - 作業ルート（Ubuntu）：`/home/tama/umu_project/UmuOS-0.1.6-dev`
 - Kernel source：`/home/tama/umu_project/external/linux-6.18.1`
