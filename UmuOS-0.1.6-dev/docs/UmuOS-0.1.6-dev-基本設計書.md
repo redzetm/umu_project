@@ -79,8 +79,8 @@ related_docs:
 - `iso_root/`
   - `boot/`（kernel/initrd/grub.cfg）
 - `tools/`
-  - `rcS_umuos016.sh`（rcSテンプレ。唯一の正）
-  - `patch_diskimg_rcS.sh`（既存disk.imgへ rcS 差し替え。安全弁）
+  - `rcS_umuos016.sh`（rcSテンプレ。唯一の正。詳細設計書の手順で生成する）
+  - `patch_diskimg_rcS.sh`（既存disk.imgへ rcS 差し替え。安全弁。詳細設計書の手順で生成する）
 - `logs/`
   - ビルドログ
 
