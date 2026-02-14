@@ -1,6 +1,6 @@
 ---
 title: UmuOS-0.1.6-dev 詳細設計書
-date: 2026-02-11
+date: 2026-02-14
 status: clean-reproducible-manual
 ---
 
