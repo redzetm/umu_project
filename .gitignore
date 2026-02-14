@@ -214,3 +214,6 @@ debug/
 .vscode/tasks.json
 
 ush-0.0.1/ush/ush
+UmuOS-0.1.6-dev/initramfs/busybox/config-1.36.1
+UmuOS-0.1.6-dev/iso_root/boot/config-6.18.1
+UmuOS-0.1.6-dev/iso_root/boot/vmlinuz-6.18.1
