@@ -1,7 +1,7 @@
 ---
 title: UmuOS-0.1.6-dev 詳細設計書
-date: 2026-02-14
-status: clean-reproducible-manual
+date: 2026-02-15
+status: accepted
 ---
 
 # UmuOS-0.1.6-dev 詳細設計書
@@ -994,3 +994,10 @@ echo "[ftpd ps]"; ps w | grep -E 'tcpsvd|ftpd|\[tcpsvd\]|\[ftpd\]' | grep -v gre
 ### Rocky へ転送（nc メモ / 任意・統一ポート12345）
 
 転送は 10章の `nc` 手順を使う（ISO/disk.img/start.sh の3本を揃える）。
+
+---
+
+## 13. 受け入れ（合格宣言）
+
+この詳細設計書の手順を Tera Term 経由で実施し、想定テストを全て終了した。
+問題なく完走できたため、受け入れ合格とする。（2026-02-15）
