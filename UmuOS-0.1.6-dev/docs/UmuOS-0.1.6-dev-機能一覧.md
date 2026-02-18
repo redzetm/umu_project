@@ -1,6 +1,6 @@
 ---
 title: UmuOS-0.1.6-dev 機能一覧
-date: 2026-02-15
+date: 2026-02-18
 status: accepted
 related_docs:
   - "./UmuOS-0.1.6-dev-基本設計書.md"
