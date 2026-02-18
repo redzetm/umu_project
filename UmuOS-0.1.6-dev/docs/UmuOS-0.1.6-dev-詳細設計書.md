@@ -648,13 +648,15 @@ sudo tee /mnt/umuos016/umu_bin/ftpd_start >/dev/null <<'EOF'
 mkdir -p /run
 
 if [ -f /run/ftpd.pid ] && kill -0 "$(cat /run/ftpd.pid)" 2>/dev/null; then
-	exit 0
+    exit 0
 fi
 
 # FTP の公開ルート（/ にすると全ディレクトリが見える）
-busybox tcpsvd -vE 0.0.0.0 21 busybox ftpd / &
+# -w: 書き込み（アップロード）を許可（実際の可否はOSのパーミッションに従う）
+busybox tcpsvd -vE 0.0.0.0 21 busybox ftpd -w / &
 echo $! > /run/ftpd.pid
 EOF
+
 sudo chown root:root /mnt/umuos016/umu_bin/ftpd_start
 sudo chmod 0755 /mnt/umuos016/umu_bin/ftpd_start
 
