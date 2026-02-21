@@ -34,7 +34,8 @@ static int enable_raw(void) {
 
   t.c_lflag &= (tcflag_t)~(ECHO | ICANON | IEXTEN);
   t.c_iflag &= (tcflag_t)~(IXON | ICRNL);
-  t.c_oflag &= (tcflag_t)~(OPOST);
+  // 出力の改行を CRLF にする（OPOSTを殺すと '\n' が復帰せず、表示が右にずれる）
+  t.c_oflag |= (tcflag_t)(OPOST | ONLCR);
   t.c_cc[VMIN] = 1;
   t.c_cc[VTIME] = 0;
 
