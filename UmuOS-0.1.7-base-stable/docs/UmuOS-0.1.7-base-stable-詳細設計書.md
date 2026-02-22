@@ -544,6 +544,8 @@ cp -f initrd.img-6.18.1 /home/tama/umu_project/UmuOS-0.1.7-base-stable/iso_root/
 test -f /home/tama/umu_project/UmuOS-0.1.7-base-stable/iso_root/boot/initrd.img-6.18.1
 ```
 
+補足：`init.c` の中身を追いたい場合は、[UmuOS-0.1.7-base-stable 実装ノート](UmuOS-0.1.7-base-stable-実装ノート.md) を参照。
+
 ---
 
 ## 6. disk.img（永続 rootfs）
@@ -873,11 +875,11 @@ ls -l /home/tama/umu_project/UmuOS-0.1.7-base-stable/UmuOS-0.1.7-base-stable-boo
 
 Rocky の `/root` に置く：
 
-- `UmuOS-0.1.7-base-stable-boot.iso`
-- `disk.img`（Ubuntuで作った `disk/disk.img` を `disk.img` にして置く）
-- `UmuOS-0.1.7-base-stable_start.sh`
+- `UmuOS-0.1.7-base-stable-boot.iso`　※パーミッションは644で問題ないです。
+- `disk.img`（Ubuntuで作った `disk/disk.img` を `disk.img` にして置く）　※パーミッションは644で問題ないです。
+- `UmuOS-0.1.7-base-stable_start.sh`　※パーミッションは755で問題ないです。
 
-### 10.0 Rocky へ 3ファイルを転送（例）
+### 10.0 Rocky へ 3ファイルを転送　基本うまく実装できていればFTP転送でOKです
 
 観測点：Rocky の `/root` に **3ファイルが揃っている**。
 理解の狙い：「OSと開発環境の分離」を守り、実行環境に持ち込む最小単位を固定する。
@@ -885,6 +887,7 @@ Rocky の `/root` に置く：
 この文書の標準は `nc`（netcat）で転送する（SSH/鍵/権限で詰まらないようにするため）。
 ここは **1ポートで順番に送る**（端末を増やさない）。
 `ROCKY_HOST` は自分の環境に合わせて置き換える。
+**※うまく予定通り実装できていればncコマンドを使わずにFTP転送できます。**
 
 事前（Rocky側）：
 
@@ -960,7 +963,7 @@ sudo NET_MODE=none ./UmuOS-0.1.7-base-stable_start.sh
 
 ---
 
-## 11. 成功判定（この通りなら「1発で行けた」）
+## 11. 成功判定（この通りなら「1発でイケた」）
 
 ゲストで確認：
 
@@ -1002,4 +1005,4 @@ echo "[ftpd ps]"; ps w | grep -E 'tcpsvd|ftpd|\[tcpsvd\]|\[ftpd\]' | grep -v gre
 ## 13. 受け入れ（合格宣言）
 
 この詳細設計書の手順を Tera Term 経由で実施し、想定テストを全て終了した。
-問題なく完走できたため、受け入れ合格とする。（2026-02-15）
+問題なく完走できたため、受け入れ合格とする。（2026-02-23）
