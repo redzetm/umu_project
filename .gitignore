@@ -10,6 +10,7 @@ UmuOS-0.1.3/kernel/linux-*/
 UmuOS-0.1.4/kernel/linux-*/
 UmuOS-0.1.4-base-stable/kernel/linux-*/
 UmuOS-0.1.5-dev/kernel/linux-*/
+UmuOS-0.1.7-base-stable/kernel/linux-*/
 
 # カーネルアーカイブ
 
@@ -19,12 +20,16 @@ UmuOS-0.1.3/kernel/*.tar.xz
 UmuOS-0.1.4/kernel/*.tar.xz
 UmuOS-0.1.4-base-stable/kernel/*.tar.xz
 UmuOS-0.1.5-dev/kernel/*.tar.xz
+UmuOS-0.1.7-base-stable/kernel/*.tar.xz
 
 # UmuOS-0.1.5-dev: out-of-tree build output（生成物）
 UmuOS-0.1.5-dev/kernel/build/
 
 # UmuOS-0.1.6-dev: out-of-tree build output（生成物）
 UmuOS-0.1.6-dev/kernel/build/
+
+# UmuOS-0.1.7-base-stable: out-of-tree build output（生成物）
+UmuOS-0.1.7-base-stable/kernel/build/
 
 # initramfs 関連の一時ファイル
 
@@ -52,6 +57,10 @@ UmuOS-0.1.6-dev/initramfs/modules/
 UmuOS-0.1.6-dev/initramfs/extracted/
 UmuOS-0.1.6-dev/initramfs/*.img
 
+UmuOS-0.1.7-base-stable/initramfs/modules/
+UmuOS-0.1.7-base-stable/initramfs/extracted/
+UmuOS-0.1.7-base-stable/initramfs/*.img
+
 
 # initramfs の生成物（拡張子 .img で終わらないため、*.img では拾えない）
 
@@ -62,6 +71,7 @@ UmuOS-0.1.4/initramfs/initrd.img-*
 UmuOS-0.1.4-base-stable/initramfs/initrd.img-*
 UmuOS-0.1.5-dev/initramfs/initrd.img-*
 UmuOS-0.1.6-dev/initramfs/initrd.img-*
+UmuOS-0.1.7-base-stable/initramfs/initrd.img-*
 
 # initramfs 生成時の中間ファイル（cpio / ファイルリスト等）
 UmuOS-0.1.*/initramfs/initrd.cpio*
@@ -81,6 +91,9 @@ UmuOS-0.1.5-dev/initramfs/rootfs/
 
 # UmuOS-0.1.6-dev: initramfs rootfs（生成物）
 UmuOS-0.1.6-dev/initramfs/rootfs/
+
+# UmuOS-0.1.7-base-stable: initramfs rootfs（生成物）
+UmuOS-0.1.7-base-stable/initramfs/rootfs/
 
 # initramfs 関連の一時ファイル（rootfs 内の bin ディレクトリ）
 
@@ -111,6 +124,12 @@ UmuOS-0.1.6-dev/initramfs/busybox/work/
 # UmuOS-0.1.6-dev: BusyBox config snapshot（生成物）
 UmuOS-0.1.6-dev/initramfs/busybox/config-*
 
+# UmuOS-0.1.7-base-stable: BusyBox workdir（生成物）
+UmuOS-0.1.7-base-stable/initramfs/busybox/work/
+
+# UmuOS-0.1.7-base-stable: BusyBox config snapshot（生成物）
+UmuOS-0.1.7-base-stable/initramfs/busybox/config-*
+
 # ISO イメージ
 
 UmuOS-0.1.1/*.iso
@@ -129,6 +148,9 @@ UmuOS-0.1.5-dev/OVMF_VARS_custom.fd
 UmuOS-0.1.6-dev/*.iso
 UmuOS-0.1.6-dev/OVMF_VARS_custom.fd
 
+UmuOS-0.1.7-base-stable/*.iso
+UmuOS-0.1.7-base-stable/OVMF_VARS_custom.fd
+
 # OVMF VARS（プロジェクト内固定）
 UmuOS-0.1.1/run/OVMF_VARS_*.fd
 UmuOS-0.1.2/run/OVMF_VARS_*.fd
@@ -138,6 +160,8 @@ UmuOS-0.1.4-base-stable/run/OVMF_VARS_*.fd
 UmuOS-0.1.5-dev/run/OVMF_VARS_*.fd
 
 UmuOS-0.1.6-dev/run/OVMF_VARS_*.fd
+
+UmuOS-0.1.7-base-stable/run/OVMF_VARS_*.fd
 
 
 # ログファイル
@@ -150,6 +174,8 @@ UmuOS-0.1.4-base-stable/logs/*.log
 UmuOS-0.1.5-dev/logs/*.log
 
 UmuOS-0.1.6-dev/logs/*.log
+
+UmuOS-0.1.7-base-stable/logs/*.log
 
 # ビルド成果物（iso_root 内）
 
@@ -178,6 +204,10 @@ UmuOS-0.1.6-dev/iso_root/boot/vmlinuz-*
 UmuOS-0.1.6-dev/iso_root/boot/initrd.img-*
 UmuOS-0.1.6-dev/iso_root/boot/config-*
 
+UmuOS-0.1.7-base-stable/iso_root/boot/vmlinuz-*
+UmuOS-0.1.7-base-stable/iso_root/boot/initrd.img-*
+UmuOS-0.1.7-base-stable/iso_root/boot/config-*
+
 
 
 # 永続ストレージ（ext4イメージ）
@@ -191,8 +221,11 @@ UmuOS-0.1.5-dev/disk/*.img
 
 UmuOS-0.1.6-dev/disk/*.img
 
+UmuOS-0.1.7-base-stable/disk/*.img
+
 # Rocky 側に持ち出す都合で直下に複製されても事故らないように
 UmuOS-0.1.6-dev/disk.img
+UmuOS-0.1.7-base-stable/disk.img
 
 # エディタの一時ファイル 
 *~
