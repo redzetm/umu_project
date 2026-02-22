@@ -7,7 +7,8 @@ Target OS: UmuOS-0.1.6-dev（想定）
 仕様の正は [ush-0.0.4/docs/ush-0.0.4-仕様書.md](ush-0.0.4/docs/ush-0.0.4-仕様書.md) とし、本書は実装手順・関数分割・データ構造・貼り付け可能コードを規定する。
 
 注意（このリポジトリ運用）:
-- 本書は「設計書」であり、ワークスペースに実装ファイルを自動生成しない。
+- 本書は「設計書」であり、実装手順・関数分割・データ構造・貼り付け可能コードを規定する。
+- 現在のリポジトリには、本書の内容に基づく参照実装として `ush-0.0.4/ush` が存在する。
 - ただし「誰がやっても同一成果物になる」ことを満たすため、貼り付け可能コードを併記する。
 - **コピペ バージョンにしているが、構造理解をしないと意味がないので、できるだけコードを参照して理解を深めることをお勧めします。**
 
@@ -130,32 +131,32 @@ ush/
 ```sh
 cd /home/tama/umu_project/
 
-rm -rf ./ush-0.0.4-work
-mkdir -p ./ush-0.0.4-work/ush/include ./ush-0.0.4-work/ush/src
+rm -rf ./ush-0.0.4/ush
+mkdir -p ./ush-0.0.4/ush/include ./ush-0.0.4/ush/src
 
 touch \
-  ./ush-0.0.4-work/ush/include/ush.h \
-  ./ush-0.0.4-work/ush/include/ush_limits.h \
-  ./ush-0.0.4-work/ush/include/ush_err.h \
-  ./ush-0.0.4-work/ush/include/ush_utils.h \
-  ./ush-0.0.4-work/ush/include/ush_env.h \
-  ./ush-0.0.4-work/ush/include/ush_prompt.h \
-  ./ush-0.0.4-work/ush/include/ush_lineedit.h \
-  ./ush-0.0.4-work/ush/include/ush_tokenize.h \
-  ./ush-0.0.4-work/ush/include/ush_expand.h \
-  ./ush-0.0.4-work/ush/include/ush_parse.h \
-  ./ush-0.0.4-work/ush/include/ush_exec.h \
-  ./ush-0.0.4-work/ush/include/ush_builtins.h \
-  ./ush-0.0.4-work/ush/src/main.c \
-  ./ush-0.0.4-work/ush/src/utils.c \
-  ./ush-0.0.4-work/ush/src/env.c \
-  ./ush-0.0.4-work/ush/src/prompt.c \
-  ./ush-0.0.4-work/ush/src/lineedit.c \
-  ./ush-0.0.4-work/ush/src/tokenize.c \
-  ./ush-0.0.4-work/ush/src/expand.c \
-  ./ush-0.0.4-work/ush/src/parse.c \
-  ./ush-0.0.4-work/ush/src/exec.c \
-  ./ush-0.0.4-work/ush/src/builtins.c
+  ./ush-0.0.4/ush/include/ush.h \
+  ./ush-0.0.4/ush/include/ush_limits.h \
+  ./ush-0.0.4/ush/include/ush_err.h \
+  ./ush-0.0.4/ush/include/ush_utils.h \
+  ./ush-0.0.4/ush/include/ush_env.h \
+  ./ush-0.0.4/ush/include/ush_prompt.h \
+  ./ush-0.0.4/ush/include/ush_lineedit.h \
+  ./ush-0.0.4/ush/include/ush_tokenize.h \
+  ./ush-0.0.4/ush/include/ush_expand.h \
+  ./ush-0.0.4/ush/include/ush_parse.h \
+  ./ush-0.0.4/ush/include/ush_exec.h \
+  ./ush-0.0.4/ush/include/ush_builtins.h \
+  ./ush-0.0.4/ush/src/main.c \
+  ./ush-0.0.4/ush/src/utils.c \
+  ./ush-0.0.4/ush/src/env.c \
+  ./ush-0.0.4/ush/src/prompt.c \
+  ./ush-0.0.4/ush/src/lineedit.c \
+  ./ush-0.0.4/ush/src/tokenize.c \
+  ./ush-0.0.4/ush/src/expand.c \
+  ./ush-0.0.4/ush/src/parse.c \
+  ./ush-0.0.4/ush/src/exec.c \
+  ./ush-0.0.4/ush/src/builtins.c
 ```
 
 この後、各ファイルの中身を本書の該当セクションからコピペして埋める。
@@ -195,7 +196,7 @@ cd /home/tama/umu_project/
 
 # 0.0.3 のソースツリーを 0.0.4 の作業領域へコピーする（例）
 # ※コマンドは例示。実際の運用に合わせて読み替える。
-cp -a ush-0.0.3/ush ./ush-0.0.4-work/ush
+cp -a ush-0.0.3/ush ./ush-0.0.4/ush
 
 # 以降、この文書の「貼り付け可」ブロックで指定されるファイルを置換する。
 ```
@@ -212,7 +213,7 @@ cp -a ush-0.0.3/ush ./ush-0.0.4-work/ush
 【実装用（貼り付け可）】
 
 ```sh
-cd /home/tama/umu_project/ush-0.0.4-work/ush
+cd /home/tama/umu_project/ush-0.0.4/ush
 
 musl-gcc -static -O2 -Wall -Wextra -Wshadow -Wpointer-arith -Wwrite-strings \
   -Iinclude \
