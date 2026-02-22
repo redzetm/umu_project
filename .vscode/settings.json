@@ -1,0 +1,30 @@
+{
+  // Make sure Linux kernel source directories are visible in Explorer.
+  // If user/global settings exclude **/linux-*, this overrides it for this workspace.
+  "files.exclude": {
+    "linux-*": false,
+    "linux-*/**": false,
+    "**/linux-*": false,
+    "**/linux-*/**": false,
+    "**/linux-6.18.1": false,
+    "**/linux-6.18.1/**": false,
+    "**/external/linux-*": false,
+    "**/external/linux-*/**": false,
+    "**/external/linux-6.18.1": false,
+    "**/external/linux-6.18.1/**": false
+  },
+
+  // Also keep kernel sources searchable in this workspace.
+  "search.exclude": {
+    "linux-*": false,
+    "linux-*/**": false,
+    "**/linux-*": false,
+    "**/linux-*/**": false,
+    "**/linux-6.18.1": false,
+    "**/linux-6.18.1/**": false,
+    "**/external/linux-*": false,
+    "**/external/linux-*/**": false,
+    "**/external/linux-6.18.1": false,
+    "**/external/linux-6.18.1/**": false
+  }
+}
