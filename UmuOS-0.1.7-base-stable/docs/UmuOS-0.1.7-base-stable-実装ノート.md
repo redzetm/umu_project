@@ -26,11 +26,33 @@ status: in_progress
 
 ### 2026-02-22
 
-- 実施範囲：
-- 結果：
+- 実施範囲：実装ノート（テンプレ）整備
+- 結果：手動実装の記録枠を作成（status: in_progress）
 
 **観測点（この時点）**
 - 
+
+### 2026-02-23
+
+- 実施範囲：詳細設計書の 1〜9 章を手順通りに実行（Ubuntu 側でビルド/生成まで）
+- 結果：ここまで何事もなく完了
+
+**生成物チェック（存在とサイズ）**
+
+- `UmuOS-0.1.7-base-stable-boot.iso`（27,539,456 bytes）
+- `iso_root/boot/vmlinuz-6.18.1`（14,091,264 bytes）
+- `iso_root/boot/initrd.img-6.18.1`（1,330,807 bytes）
+- `disk/disk.img`（4,294,967,296 bytes）
+- `logs/kernel_build_bzImage.log`（151,363 bytes）
+- `logs/busybox_build.log`（44,497 bytes）
+- `tools/rcS_umuos016.sh`（1,968 bytes）
+- `tools/patch_diskimg_rcS.sh`（1,848 bytes）
+- `UmuOS-0.1.7-base-stable_start.sh`（2,563 bytes）
+
+**観測点（この時点）**
+
+- `disk/disk.img` の UUID：`d2c0b3c3-0b5e-4d24-8c91-09b3a4fb0c15`（設計書の固定値と一致）
+- 以降は Rocky 側へ 3ファイル転送 → 起動観測（ttyS1）へ進む
 
 ---
 
