@@ -10,6 +10,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#define UIM_VERSION "0.0.2"
+
 static void uim_init(uim_t *u, const char *path) {
   memset(u, 0, sizeof(*u));
   u->mode = UIM_MODE_NORMAL;
@@ -55,8 +57,12 @@ int main(int argc, char **argv) {
       batch = 1;
       continue;
     }
+    if (strcmp(argv[i], "--version") == 0) {
+      printf("%s\n", UIM_VERSION);
+      return 0;
+    }
     if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-      fprintf(stderr, "usage: uim [--batch] <file>\n");
+      fprintf(stderr, "usage: uim [--batch] [--version] <file>\n");
       return 2;
     }
     if (argv[i][0] == '-') {
@@ -67,7 +73,7 @@ int main(int argc, char **argv) {
   }
 
   if (path == NULL) {
-    fprintf(stderr, "usage: uim [--batch] <file>\n");
+    fprintf(stderr, "usage: uim [--batch] [--version] <file>\n");
     return 2;
   }
 
