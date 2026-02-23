@@ -193,4 +193,14 @@ EOF
 printf '/日本語CSS日本語\n0iX\033$n0iY\033:wq\n' | "$BIN" --batch "$F10"
 assert_file_eq "search+japanese+/+n" "$F10" $'A\nXあ日本語CSS日本語 one\nYあ日本語CSS日本語 two\nZ\n'
 
+# Test 11: --version
+V=$(/bin/echo -n "" | "$BIN" --version)
+if [[ "$V" != "0.0.2" ]]; then
+  echo "[FAIL] version" >&2
+  echo "  expected: 0.0.2" >&2
+  echo "  got: $V" >&2
+  exit 1
+fi
+echo "[OK]   version"
+
 echo "ALL OK"
