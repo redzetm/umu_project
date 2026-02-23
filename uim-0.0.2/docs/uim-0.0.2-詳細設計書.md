@@ -1700,6 +1700,8 @@ int uim_run_batch(uim_t *u, int in_fd) {
 #include <string.h>
 #include <unistd.h>
 
+#define UIM_VERSION "0.0.2"
+
 static void uim_init(uim_t *u, const char *path) {
   memset(u, 0, sizeof(*u));
   u->mode = UIM_MODE_NORMAL;
@@ -1745,8 +1747,12 @@ int main(int argc, char **argv) {
       batch = 1;
       continue;
     }
+    if (strcmp(argv[i], "--version") == 0) {
+      printf("%s\n", UIM_VERSION);
+      return 0;
+    }
     if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-      fprintf(stderr, "usage: uim [--batch] <file>\n");
+      fprintf(stderr, "usage: uim [--batch] [--version] <file>\n");
       return 2;
     }
     if (argv[i][0] == '-') {
@@ -1757,7 +1763,7 @@ int main(int argc, char **argv) {
   }
 
   if (path == NULL) {
-    fprintf(stderr, "usage: uim [--batch] <file>\n");
+    fprintf(stderr, "usage: uim [--batch] [--version] <file>\n");
     return 2;
   }
 
@@ -1974,6 +1980,16 @@ EOF
 #   :wq Enter
 printf '/日本語CSS日本語\n0iX\033$n0iY\033:wq\n' | "$BIN" --batch "$F10"
 assert_file_eq "search+japanese+/+n" "$F10" $'A\nXあ日本語CSS日本語 one\nYあ日本語CSS日本語 two\nZ\n'
+
+# Test 11: --version
+V=$(/bin/echo -n "" | "$BIN" --version)
+if [[ "$V" != "0.0.2" ]]; then
+  echo "[FAIL] version" >&2
+  echo "  expected: 0.0.2" >&2
+  echo "  got: $V" >&2
+  exit 1
+fi
+echo "[OK]   version"
 
 echo "ALL OK"
 ```
