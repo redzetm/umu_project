@@ -64,7 +64,7 @@ Target OS: UmuOS-0.1.7-base-stable（想定）
   - `--batch`（stdin 疑似入力）処理
 
 - `main`（起動）
-  - 引数解析（`--batch`）
+  - 引数解析（`--batch` / `--version`）
   - バッファロード
   - interactive/batch 実行
 
