@@ -1,0 +1,51 @@
+# uman
+
+UmuOS向けの「日本語マニュアル（Markdown）」を表示するための最小ビューアです。
+
+- ページは Markdown（`.md`）で管理
+- `uman <name>` でページをそのまま標準出力へ出す
+- 長い場合は `| more` などで閲覧
+
+## ディレクトリ構成
+
+- `uman/pages/ja/` : 日本語ページ（管理用）
+- `uman/src/` : `uman` 本体ソース（C）
+
+UmuOS（disk.img）へ配置するときの想定:
+- バイナリ: `/umu_bin/uman`
+- ページ: `/usr/share/uman/ja/*.md`
+
+## ビルド
+
+```sh
+make -C uman
+```
+
+## ローカルで試す
+
+```sh
+UMAN_PATH=uman/pages/ja uman/uman uman
+```
+
+## 使い方
+
+- `uman <name>`: `<name>.md` を表示
+- `uman --list`: ページ一覧を表示
+- `uman -w <name>`: 参照するページのパスを表示
+- `uman -k <word>`: ページ内容を簡易検索
+
+検索パス:
+- 既定: `/usr/share/uman/ja`
+- 上書き: 環境変数 `UMAN_PATH`（単一ディレクトリ）
+
+## インストール（UmuOSへ持ち込み）
+
+1) `uman/uman` を `/umu_bin/uman` へコピー
+2) `uman/pages/ja/*.md` を `/usr/share/uman/ja/` へコピー
+
+表示:
+
+```sh
+uman netstat
+uman netstat | more
+```
