@@ -68,7 +68,7 @@ static int build_page_path(char *buf, size_t buflen, const char *root, const cha
 }
 
 static int copy_file_to_stdout(const char *path) {
-    FILE *fp = fopen(path, "rb");
+    FILE *fp = fopen(path, "r");
     if (!fp) {
         return -1;
     }
@@ -93,7 +93,7 @@ static int copy_file_to_stdout(const char *path) {
 static void list_pages(const char *root) {
     DIR *d = opendir(root);
     if (!d) {
-        fprintf(stderr, "uman: cannot open dir: %s: %s\n", root, strerror(errno));
+        fprintf(stdout, "uman: cannot open dir: %s: %s\n", root, strerror(errno));
         return;
     }
 
@@ -125,7 +125,7 @@ static void list_pages(const char *root) {
 }
 
 static int file_contains_word(const char *path, const char *word) {
-    FILE *fp = fopen(path, "rb");
+    FILE *fp = fopen(path, "r");
     if (!fp) {
         return 0;
     }
@@ -145,7 +145,7 @@ static int file_contains_word(const char *path, const char *word) {
 static int search_pages(const char *root, const char *word) {
     DIR *d = opendir(root);
     if (!d) {
-        fprintf(stderr, "uman: cannot open dir: %s: %s\n", root, strerror(errno));
+        fprintf(stdout, "uman: cannot open dir: %s: %s\n", root, strerror(errno));
         return 1;
     }
 
@@ -188,7 +188,7 @@ int main(int argc, char **argv) {
     const char *root = get_root_dir();
 
     if (argc <= 1) {
-        print_usage(stderr);
+        print_usage(stdout);
         return 2;
     }
 
@@ -204,17 +204,17 @@ int main(int argc, char **argv) {
 
     if (strcmp(argv[1], "-w") == 0) {
         if (argc < 3) {
-            fprintf(stderr, "uman: -w requires <name>\n");
+            fprintf(stdout, "uman: -w requires <name>\n");
             return 2;
         }
         const char *name = argv[2];
         if (!is_safe_name(name)) {
-            fprintf(stderr, "uman: invalid name: %s\n", name);
+            fprintf(stdout, "uman: invalid name: %s\n", name);
             return 2;
         }
         char path[1024];
         if (build_page_path(path, sizeof(path), root, name) != 0) {
-            fprintf(stderr, "uman: path too long\n");
+            fprintf(stdout, "uman: path too long\n");
             return 1;
         }
         puts(path);
@@ -223,7 +223,7 @@ int main(int argc, char **argv) {
 
     if (strcmp(argv[1], "-k") == 0) {
         if (argc < 3) {
-            fprintf(stderr, "uman: -k requires <word>\n");
+            fprintf(stdout, "uman: -k requires <word>\n");
             return 2;
         }
         return search_pages(root, argv[2]);
@@ -231,19 +231,19 @@ int main(int argc, char **argv) {
 
     const char *name = argv[1];
     if (!is_safe_name(name)) {
-        fprintf(stderr, "uman: invalid name: %s\n", name);
+        fprintf(stdout, "uman: invalid name: %s\n", name);
         return 2;
     }
 
     char path[1024];
     if (build_page_path(path, sizeof(path), root, name) != 0) {
-        fprintf(stderr, "uman: path too long\n");
+        fprintf(stdout, "uman: path too long\n");
         return 1;
     }
 
     if (copy_file_to_stdout(path) != 0) {
-        fprintf(stderr, "uman: page not found: %s\n", name);
-        fprintf(stderr, "uman: tried: %s\n", path);
+        fprintf(stdout, "uman: page not found: %s\n", name);
+        fprintf(stdout, "uman: tried: %s\n", path);
         return 1;
     }
 
