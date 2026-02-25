@@ -21,6 +21,14 @@ UmuOS（disk.img）へ配置するときの想定:
 make -C uman
 ```
 
+### UmuOS向け（静的リンク）
+
+UmuOS の最小環境では動的リンカが無い/見えない場合があるため、静的リンク版でビルドします。
+
+```sh
+make -C uman clean all STATIC=1 CC=musl-gcc
+```
+
 ## ローカルで試す
 
 ```sh
@@ -48,4 +56,18 @@ UMAN_PATH=uman/pages/ja uman/uman uman
 ```sh
 uman netstat
 uman netstat | more
+```
+
+## トラブルシュート（UmuOS上で何も出ない）
+
+まず参照しているパスを確認します:
+
+```sh
+uman -w netstat
+```
+
+表示されたファイルが存在するかを確認します:
+
+```sh
+ll /usr/share/uman/ja/netstat.md
 ```
