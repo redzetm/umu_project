@@ -51,6 +51,9 @@ UMAN_PATH=uman/pages/ja uman/uman uman
 1) `uman/uman` を `/umu_bin/uman` へコピー
 2) `uman/pages/ja/*.md` を `/usr/share/uman/ja/` へコピー
 
+※UmuOS では静的リンク版（`make -C uman STATIC=1 CC=musl-gcc`）を入れてください。
+動的リンク版のELFを入れると、シェルのエラー出力が見えない環境では「何も起きない」ように見えることがあります。
+
 表示:
 
 ```sh
