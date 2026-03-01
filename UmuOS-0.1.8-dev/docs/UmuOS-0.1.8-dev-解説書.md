@@ -275,10 +275,9 @@ musl-gcc -static -O2 -Wall -Wextra -Wshadow -Wpointer-arith -Wwrite-strings \
 ### UmuOS へ持ち込む例（概念）
 
 - `ush` バイナリをゲストへ転送（FTP等）して、まずは `/home/tama/` など書き込み可能な場所へ置く
-- ゲスト側で root になり（`/umu_bin/su`）、`/umu_bin/ush` として配置する
+- ゲスト側で root でログインして、`/umu_bin/ush` として配置する
 
 ```sh
-su
 cp /home/tama/ush /umu_bin/ush
 chown root:root /umu_bin/ush
 chmod 0755 /umu_bin/ush
