@@ -108,9 +108,6 @@ related_docs:
 - `/umu_bin` を PATH 最優先にする
 - `ll`
   - `/umu_bin/ll` は `ls -l` の薄いラッパ
-- `su`（自作）
-  - `/umu_bin/su`（静的リンク、SUID root `4755`）
-  - `/etc/shadow` の root 行の `$6$...` を `crypt(3)` で検証し、成功したら `setuid(0)` して `/bin/sh`
 
 ## 5. 観測点（成功判定に直結）
 
