@@ -164,6 +164,10 @@ UmuOS-0.1.6-dev/run/OVMF_VARS_*.fd
 UmuOS-0.1.7-base-stable/run/OVMF_VARS_*.fd
 
 
+# ush: ローカルビルド生成物
+ush-0.0.*/ush/ush_test_build
+
+
 # ログファイル
 
 UmuOS-0.1.1/logs/*.log
