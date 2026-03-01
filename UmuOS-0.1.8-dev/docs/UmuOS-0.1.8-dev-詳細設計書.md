@@ -458,7 +458,7 @@ CONFIG_SWITCH_ROOT=y
 CONFIG_TELNETD=y
 CONFIG_FEATURE_TELNETD_STANDALONE=y
 CONFIG_LOGIN=y
-# /etc/shadow を使う（ここが無いと login/su 周りの挙動が環境差になりやすい）
+# /etc/shadow を使う（ここが無いと login 周りの挙動が環境差になりやすい）
 CONFIG_FEATURE_SHADOWPASSWDS=y
 CONFIG_IP=y
 CONFIG_NC=y
