@@ -40,8 +40,6 @@ related_docs:
 - リモート
   - telnet ログイン（BusyBox `telnetd` + `login`）
   - FTP サーバ（BusyBox `tcpsvd` + `ftpd`、公開ルート `/`）
-- 自作 `su`
-  - 静的リンクの小さな `su` を `/umu_bin/su` に配置（SUID root）
 
 ## 4. 実行環境の前提
 
