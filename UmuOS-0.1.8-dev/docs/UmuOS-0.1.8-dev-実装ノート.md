@@ -595,7 +595,6 @@ int main(void)
 ### 2026-02-23
 
 - JST / ntpd 同期：OK
-- su：OK
 - ll：OK
 - FTP：OK
 - telnet：OK
@@ -607,4 +606,4 @@ int main(void)
 ### 2026-02-23
 
 - 判定：受け入れ試験OK（合格）
-- 根拠（観測点）：起動観測（mount/boot.log/JST/NTP）と、テスト結果（JST/su/ll/FTP/telnet）が全てOK
+- 根拠（観測点）：起動観測（mount/boot.log/JST/NTP）と、テスト結果（JST/ll/FTP/telnet）が全てOK
