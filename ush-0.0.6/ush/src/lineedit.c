@@ -18,6 +18,7 @@ typedef struct {
 } raw_state_t;
 
 static raw_state_t g_raw;
+static int g_raw_atexit_registered;
 
 static void restore_raw(void) {
   if (g_raw.enabled) {
@@ -41,7 +42,10 @@ static int enable_raw(void) {
 
   if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &t) != 0) return 1;
   g_raw.enabled = 1;
-  atexit(restore_raw);
+  if (!g_raw_atexit_registered) {
+    atexit(restore_raw);
+    g_raw_atexit_registered = 1;
+  }
   return 0;
 }
 
@@ -344,6 +348,8 @@ int ush_lineedit_readline(const char *prompt, char *out_line, size_t out_cap, us
 
   if (enable_raw() != 0) return 1;
 
+  int rc = 1;
+
   char buf[USH_MAX_LINE_LEN + 1];
   size_t len = 0;
   size_t cursor = 0;
@@ -359,20 +365,25 @@ int ush_lineedit_readline(const char *prompt, char *out_line, size_t out_cap, us
   for (;;) {
     unsigned char ch;
     ssize_t r = read(STDIN_FILENO, &ch, 1);
-    if (r <= 0) return 1;
+    if (r <= 0) {
+      rc = 1;
+      goto out;
+    }
 
     if (ch == '\r' || ch == '\n') {
       fputc('\n', stdout);
       buf[len] = '\0';
       snprintf(out_line, out_cap, "%s", buf);
       if (hist != NULL && out_line[0] != '\0') hist_push(hist, out_line);
-      return 0;
+      rc = 0;
+      goto out;
     }
 
     if (ch == 0x04) { // Ctrl-D
       if (len == 0) {
         fputc('\n', stdout);
-        return 1;
+        rc = 1;
+        goto out;
       }
       continue;
     }
@@ -471,4 +482,8 @@ int ush_lineedit_readline(const char *prompt, char *out_line, size_t out_cap, us
       continue;
     }
   }
+
+out:
+  restore_raw();
+  return rc;
 }
