@@ -133,7 +133,16 @@ UmuOSの“学習”としても、どこからが自分の責務かが見えや
 
 補足（回答）：
 - いまの実機確認結果：`test -d /sys/firmware/efi && echo UEFI || echo BIOS` → **BIOS(Legacy)**
+- いまの実機確認結果：`readlink -f /etc/grub2.cfg` → **`/boot/grub2/grub.cfg`**
 - よって、この環境で grub2-mkconfig の生成先として正しいのは基本的に **`/etc/grub2.cfg` の実体**（典型は `/boot/grub2/grub.cfg`）。
+
+実測ログ：
+
+```bash
+[root@umuops etc]# readlink -f /etc/grub2.cfg
+/boot/grub2/grub.cfg
+[root@umuops etc]#
+```
 
 確認コマンド：
 
@@ -214,8 +223,25 @@ readlink -f /etc/grub2-efi.cfg 2>/dev/null || true
 	ブートログや `switch_root` 失敗時の観測性が大きく変わる。
 
 今回の実測（Rocky通常起動時）：
-- `/proc/cmdline` に `console=...` が無い（`rhgb quiet` のみ）
-- `cat /sys/class/tty/console/active` は `tty0`
+- `/proc/cmdline` に `console=...` が無い（=現状は ttyS0 をカーネルコンソールとして使っていない）
+
+実測ログ：
+
+```bash
+[root@umuops etc]# cat /proc/cmdline
+BOOT_IMAGE=(hd0,msdos1)/vmlinuz-5.14.0-611.36.1.el9_7.x86_64 root=/dev/mapper/rl-root ro resume=/dev/mapper/rl-swap rd.lvm.lv=rl/root rd.lvm.lv=rl/swap rhgb quiet crashkernel=1G-2G:192M,2G-64G:256M,64G-:512M
+[root@umuops etc]#
+```
+
+- `cat /sys/class/tty/console/active` は `tty0`（=かごやのWEBコンソールで見えているのは tty0 側）
+
+実測ログ：
+
+```bash
+[root@umuops etc]# cat /sys/class/tty/console/active
+tty0
+[root@umuops etc]#
+```
 - `dmesg` に `ttyS0 ... 16550A` が存在し、virtio-vga/fbcon が primary と出ている
 	- つまり「ttyS0 は存在するが、カーネルコンソールとしては使っていない」状態
 
@@ -386,6 +412,10 @@ telnet 成功には、UmuOS 側が次を満たす必要がある：
 
 - かごや側の管理コンソール（シリアル/レスキュー/ISOブート等）でログインできることを確認
 - Rocky の通常ブートが残ることを確認（GRUBのデフォルトは変えない）
+
+今回の確認結果（回答）：
+- かごや管理コンソールでログインできるか（GRUB操作・ログ確認ができるか）：**yes**
+- レスキューモード/ISO起動が使えるか：**yes**
 
 理由：ネットワーク設定をミスると、telnetは当然繋がらず、SSHも消える（Rockyユーザーランドを起動しないため）。
 
