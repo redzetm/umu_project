@@ -1,22 +1,105 @@
-UmuOS0.1.7-base-stableをかごやに立てているRockyLinuxから起動させて、switch_rootして、UmuOSに自宅からアクセスできるようにする：計画
+RockyLinuxがブート中にswitch_rootしてUmuOSユーザーランドへ移行し、telnetで自宅からログインできるようにする：計画（完成形）
 
-この文書は「やること順」を固定し、観測点（成功判定）と切り分け手順を同時に持つための計画書。
-最短ルートは **ゲストにネットワークを持たせなくても**（= `NET_MODE=none`）
-「自宅 → Rocky(SSH) → QEMUのttyS1(SSHポートフォワード) → UmuOSログイン」で到達できる。
+狙い（完成形の定義）：
+- RockyLinux を「カーネル＋initramfs」まで起動させる
+- initramfs の `/init` が `switch_root` で rootfs を切り替える
+- 切り替え先 rootfs は UmuOS（disk.img 由来）で、`/etc/inittab` → `rcS` が走る
+- `rcS` によりネットワーク初期化と `telnetd` 起動が行われ、自宅から `telnet <VPSのグローバルIP> 23` で `login:` が出る
 
-前提：
-- かごや上の RockyLinux で QEMU が動く（KVMが使えなくても最悪TCGで動かせる）
-- UmuOS-0.1.7-base-stable の「3点セット」を Rocky 側へ置ける
-	- ISO: `UmuOS-0.1.7-base-stable-boot.iso`
-	- 永続ディスク: `disk.img`
-	- 起動スクリプト: `UmuOS-0.1.7-base-stable_start.sh`
+重要な前提（ここが設計の要）：
+- UmuOS-0.1.7 の initramfs `/init`（`init.c`）は、`root=UUID=...` を手掛かりに `/dev/vd*` `/dev/sd*` `/dev/nvme*` の ext4 を探す実装になっている。
+	- つまり「disk.img をファイルとして置いて loop で読む」だけでは、そのままでは見つからない（`/dev/loop*` が候補に入っていない）
+- したがって成立パターンは2つ：
+	1) **確実ルート（推奨）**：disk.img を“ブロックデバイス化”する（専用パーティション / LVM LV / 別ディスク）
+	2) **ファイル運用ルート**：initramfs 側を改造して loop を候補に入れ、disk.img を loop デバイスとして使う
+
+セキュリティ注意（必読）：
+- telnet は平文。インターネット直出しは危険。
+- この完成形をやるなら「かごや側のFW（上流のパケットフィルタ）」で **自宅の送信元IPだけ 23/TCP を許可** を前提にする。
+	- UmuOS（BusyBox中心の最小ユーザーランド）では Rocky の `firewalld` のような防御層が基本ないため。
 
 参照（設計の正）：
-- UmuOS側の起動手順と観測点：`UmuOS-0.1.7-base-stable/docs/UmuOS-0.1.7-base-stable-解説書.md`
-- switch_root の実装（initramfsの /init）：`UmuOS-0.1.7-base-stable/initramfs/src/init.c`
-- 起動スクリプト（ttyS1転送/NET_MODE）：`UmuOS-0.1.7-base-stable/UmuOS-0.1.7-base-stable_start.sh`
+- UmuOS rcS（telnetd起動/ネットワーク初期化の考え方）：[UmuOS-0.1.7-base-stable/docs/UmuOS-0.1.7-base-stable-解説書.md](../UmuOS-0.1.7-base-stable/docs/UmuOS-0.1.7-base-stable-解説書.md)
+- initramfs `/init`（switch_root 実装）：[UmuOS-0.1.7-base-stable/initramfs/src/init.c](../UmuOS-0.1.7-base-stable/initramfs/src/init.c)
 
 ---
+
+# 0. ゴール定義（Doneの定義：完成形）
+
+Done（成功）：
+1) 再起動後、initramfsログに次が出る
+	 - `[init] mount root ok (rw): ...`
+	 - `[init] exec: /bin/switch_root /newroot /sbin/init`
+2) switch_root 後、UmuOS rootfs の `rcS` が動き、ゲスト（=同一マシン）のネットワークが成立する
+3) 自宅から `telnet <VPSのグローバルIP> 23` で `login:` が出てログインできる
+
+Rollback（失敗時に戻せる）：
+- Rocky の通常起動エントリを温存し、**一回だけ試す**（`grub2-reboot` 等）ことで、失敗しても次回通常起動に戻せる
+- かごやの管理コンソール（シリアル/レスキュー）で復旧できる手段を事前に確保する
+
+---
+
+# 1. 成立パターンの選択（最初に決める）
+
+## 1.1 推奨：disk.img をブロックデバイス化（パーティション/LV）
+
+なぜ推奨か：
+- 既存の `init.c` のまま成立させやすい（`/dev/vda3` のように見える）
+- initramfs を最小変更で済ませられる
+
+ざっくり手順（計画の骨）：
+1) VPS のディスクに空き領域を確保し、UmuOS 用のパーティション（例：`/dev/vda3`）または LVM LV を作る
+2) そのブロックデバイスを ext4 で初期化し、UUID を UmuOS が期待する値へ合わせる
+3) UmuOS rootfs（disk.img の中身）をそこへ展開する（= `/sbin/init` `/etc/inittab` `/etc/init.d/rcS` が存在する状態）
+4) Rocky の GRUB に「UmuOS起動用エントリ（kernelはRockyのもの）」を追加し、`root=UUID=<UmuOSのUUID>` で initramfs `/init` に switch_root させる
+
+注意：disk.img を `dd` でパーティションへ“丸ごと書く”方式もあるが、運用/切り分けが難しくなりやすい。
+（ただし「とにかく早く形にする」目的なら有効。)
+
+## 1.2 代替：disk.img をファイル運用（loop で読む）
+
+成立させる条件：
+- initramfs `/init` が、どこかのファイルシステムを先にマウントして disk.img ファイルへアクセスできること
+- disk.img を loop デバイスへ関連付けし、その loop デバイスを ext4 として mount できること
+- `init.c` の候補デバイスに `/dev/loop*` を追加（=コード修正＆initramfs再生成）が必要
+
+このルートは「やることが増える」ので、最初は 1.1 を推奨。
+
+---
+
+# 2. ネットワーク設計（telnet成功条件の核）
+
+telnet 成功には、UmuOS 側が次を満たす必要がある：
+- NIC 名が `eth0` で揃う（`net.ifnames=0 biosdevname=0` を kernel cmdline に入れる）
+- `/etc/umu/network.conf` が VPS の実ネットワークと一致（IP/プレフィックス/GW/DNS）
+- `rcS` が `telnetd -p 23 -l /bin/login` を起動
+
+実務的な決め方：
+1) Rocky通常起動で `ip a` / `ip r` を控える（グローバルIP、デフォルトGW、NIC名）
+2) その値を UmuOS の `/etc/umu/network.conf` に焼く
+3) かごや側FWで 23/TCP を自宅IPのみに制限
+
+---
+
+# 3. 安全な切替手順（ブートローダ改変で詰まないため）
+
+原則：
+- **デフォルトはRockyのまま**
+- 起動テストは **1回だけそのエントリで起動**（ワンショット）
+
+手順案：
+1) GRUBへ UmuOS 起動エントリを追加（40_custom等）
+2) `grub2-mkconfig` で反映（UEFI/BIOSで出力先が違うので注意）
+3) `grub2-reboot '<エントリ名>'` で次回だけ UmuOSエントリを選ぶ
+4) 再起動
+5) 失敗したら管理コンソールで Rocky エントリへ戻す
+
+---
+
+# 4. 旧案（参考）：Rocky上でQEMU起動してUmuOSへ入るプラン
+
+以下は「RockyをホストとしてQEMUでUmuOSを起動する」案。
+完成形（Rockyがswitch_rootしてUmuOS化）とは別物なので、参考として残す。
 
 # 0. ゴール定義（Doneの定義）
 
