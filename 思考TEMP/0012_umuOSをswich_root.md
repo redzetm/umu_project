@@ -101,6 +101,89 @@ UmuOSの“学習”としても、どこからが自分の責務かが見えや
 
 ---
 
+# 0.2.1-dev 準備：RockyLinux9.7 から参考用にコピーしておくファイル一覧
+
+目的：
+- 0.2系は「Rocky pre-switch_root を維持」する方針なので、Rocky側の“起動に効く設定”を手元に控えておく。
+- 将来、UmuOS起動エントリが壊れた/挙動が変わったとき、差分をすぐ取れるようにする。
+
+コピー先（このリポジトリ側）：
+- `/home/tama/umu_project/UmuOS-0.2.1-dev/docs/RockyLinux9.7参考ファイル　ディレクトリ/`
+
+注意：
+- `/etc/NetworkManager/system-connections/*` などは権限が厳しい（600）ので、コピーは `sudo` 前提。
+- 秘密情報（パスワード/鍵）が混じり得るファイルは、保存前にマスクするか、そもそも保存しない。
+
+## A. ブート/GRUB（必須）
+
+- `/etc/default/grub`
+	- GRUBの基本パラメータ（kernel cmdlineの基礎）
+- `/etc/grub.d/40_custom`
+	- UmuOS起動用の `menuentry` を置く場所（運用の正）
+- `/etc/grub2-efi.cfg`（※通常はsymlink）
+	- UEFIで実際に参照される grub.cfg への入口（/boot/grub2/grub.cfg でいいですかね）
+- `/boot/efi/EFI/*/grub.cfg`（存在する場合）
+	- 実体の grub.cfg。`readlink -f /etc/grub2-efi.cfg` で実体パスを確認して、それを保存する（/boot/grub2/grub.cfg でいいですかね）
+
+## B. /boot（必須：どのkernel/initramfsで起動しているかの証拠）
+
+- `/boot/vmlinuz-*`
+- `/boot/initramfs-*.img`
+- `/boot/loader/entries/*.conf`（ある場合：BLS運用）
+
+目的：
+- 「UmuOS起動エントリで、どの kernel と initramfs を使っていたか」を後で再現するため。
+
+## C. dracut / initramfs生成（推奨）
+
+- `/etc/dracut.conf`
+- `/etc/dracut.conf.d/*.conf`
+
+目的：
+- 0.2系で “Rocky initramfs をそのまま使う” 場合でも、将来再生成が必要になる。
+- そのときの差分確認（何が入っていたか）に効く。
+
+## D. ストレージ/マウント（必須〜推奨：switch_root先に直結）
+
+- `/etc/fstab`
+	- Rocky側が通常起動するための基礎（壊すと戻れない）
+- `/etc/crypttab`（使っている場合）
+- `/etc/lvm/lvm.conf`（LVMを使っている場合）
+
+目的：
+- UmuOS rootfs を「別パーティション/LV」に置く方式の設計判断に効く。
+
+## E. ネットワーク（推奨：UmuOS側へ値を持ち込む材料）
+
+- `/etc/hostname`
+- `/etc/hosts`
+- `/etc/resolv.conf`（※NetworkManager管理の場合がある点に注意）
+- `/etc/NetworkManager/NetworkManager.conf`
+- `/etc/NetworkManager/system-connections/*.nmconnection`（機密が混じる可能性があるので要注意）
+- `/etc/sysconfig/network-scripts/`（存在する場合）
+
+目的：
+- UmuOS の `/etc/umu/network.conf`（static IP/GW/DNS）を作るときの根拠として控える。
+
+## F. Firewall / SELinux（推奨：telnet/ftp公開時の外側制御）
+
+- `/etc/firewalld/firewalld.conf`
+- `/etc/firewalld/zones/*.xml`
+- `/etc/firewalld/services/*.xml`
+- `/etc/selinux/config`
+
+目的：
+- 0.2系は「外側（かごやFW）で制御」が主だが、Rocky側で何をしていたかを記録しておく。
+
+## G. 任意（役に立つことがある）
+
+- `/etc/sysctl.conf`
+- `/etc/sysctl.d/*.conf`
+- `/etc/security/limits.conf`
+- `/etc/security/limits.d/*`
+
+---
+
 狙い（完成形の定義）：
 - RockyLinux を「カーネル＋initramfs」まで起動させる
 - initramfs の `/init` が `switch_root` で rootfs を切り替える
