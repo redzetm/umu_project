@@ -1,5 +1,59 @@
 RockyLinuxがブート中にswitch_rootしてUmuOSユーザーランドへ移行し、telnetで自宅からログインできるようにする：計画（完成形）
 
+---
+
+# 0.2系 方針案：Rocky pre-switch_root を維持し、ユーザーランドだけ UmuOS（0.2.1-dev 以降）
+
+方針（ひとことで）：
+- 「ブートまでの土台（kernel/initramfs/ドライバ/ディスク発見）は RockyLinux に任せる」
+- 「`switch_root` 後の世界（`/sbin/init`→`inittab`→`rcS`→telnetd 等）は UmuOS が担当する」
+
+これは “Rockyで起動するUmuOS” であり、0.2系の軸として筋が良い。
+
+## この方式のメリット
+
+### 1) ハードウェア/仮想環境互換が強い（VPSで刺さりやすい）
+
+- VPS特有のストレージ/NIC/コンソールの癖を、Rockyの kernel+initramfs（dracut等）が吸収してくれる。
+- UmuOSは「rootfsが見つからない」「NICが変な名前」などの沼に入りにくい。
+- 特に “ディスク発見（/devが出るまでの流れ）” をRockyに委ねられるのが大きい。
+
+### 2) セキュリティ更新・運用更新をRocky側に寄せられる
+
+- kernelの脆弱性修正やドライバ回りの更新を、Rockyの更新フローに乗せやすい。
+- UmuOS側は「ユーザーランド（研究対象）」に集中できる。
+
+補足：UmuOSが研究用途でも、インターネットに置く以上 kernel の更新は重要。
+
+### 3) 開発スピードが上がる（0.2系で攻めるべき場所が明確になる）
+
+- kernel/config/initramfs のビルド地獄を避けられ、`rcS` や `/umu_bin` の改修が主戦場になる。
+- 「再現性の高い土台（Rocky）」＋「変化させたい部分（UmuOS）」が分離できる。
+
+### 4) 切り分けが簡単（責務境界が明確）
+
+この方式は責務が綺麗に二分される：
+- pre-switch_root（Rocky側）で壊れるなら：
+	- そもそもブート・ディスク発見・initramfsの問題
+- post-switch_root（UmuOS側）で壊れるなら：
+	- `/sbin/init` / `inittab` / `rcS` / ネットワーク設定 / telnetd の問題
+
+UmuOSの“学習”としても、どこからが自分の責務かが見えやすい。
+
+### 5) ロールバックがやりやすい（VPSで致命傷になりにくい）
+
+- GRUBのワンショット起動（`grub2-reboot`）と相性が良い。
+- Rockyの通常エントリを残しておけば「次の再起動で復旧」が狙える。
+
+### 6) 「telnetを使う」実験が成立しやすい
+
+- UmuOSは最小ユーザーランドなので、ネットワーク周りを単純に保ちやすい（`rcS`で `ip link/addr/route` → `telnetd`）。
+- 逆に複雑な仕組み（NetworkManager等）を避けられる。
+
+注意：telnet自体は平文なので、到達制御（かごや側FWで送信元を自宅IPに限定等）とセットで運用する。
+
+---
+
 狙い（完成形の定義）：
 - RockyLinux を「カーネル＋initramfs」まで起動させる
 - initramfs の `/init` が `switch_root` で rootfs を切り替える
@@ -96,7 +150,222 @@ telnet 成功には、UmuOS 側が次を満たす必要がある：
 
 ---
 
-# 4. 旧案（参考）：Rocky上でQEMU起動してUmuOSへ入るプラン
+# 4. 実装手順（推奨：disk.img をブロックデバイス化）
+
+この節は「最短で成功させる」ための具体手順。
+
+## 4.1 事前に必ず用意する（詰んだ時の復旧経路）
+
+- かごや側の管理コンソール（シリアル/レスキュー/ISOブート等）でログインできることを確認
+- Rocky の通常ブートが残ることを確認（GRUBのデフォルトは変えない）
+
+理由：ネットワーク設定をミスると、telnetは当然繋がらず、SSHも消える（Rockyユーザーランドを起動しないため）。
+
+## 4.2 UmuOS rootfs 用のブロックデバイスを用意
+
+推奨：VPSに「追加ディスク」をアタッチして、それを UmuOS rootfs に使う。
+（ルートディスクのパーティション再分割は事故率が上がる）
+
+Rocky通常起動の状態で：
+
+```bash
+sudo lsblk -f
+```
+
+以降は例として追加ディスクが `/dev/vdb` として見える想定。
+
+### 4.2.1 パーティション作成（例）
+
+```bash
+sudo parted /dev/vdb --script mklabel gpt
+sudo parted /dev/vdb --script mkpart umuos ext4 1MiB 100%
+sudo partprobe /dev/vdb
+sudo lsblk -f /dev/vdb
+```
+
+### 4.2.2 ext4作成（UUID固定）
+
+UmuOSの `init.c` は `root=UUID=...` を読むので、ここで UUID を固定する。
+
+```bash
+U_UUID='d2c0b3c3-0b5e-4d24-8c91-09b3a4fb0c15'   # UmuOS-0.1.7-base-stable が想定しているUUID例
+sudo mkfs.ext4 -F -U "$U_UUID" /dev/vdb1
+sudo blkid /dev/vdb1
+```
+
+## 4.3 disk.img から rootfs を展開（コピー）
+
+disk.img は ext4 ファイルシステムイメージなので、Rocky上では loop でマウントして中身を取り出せる。
+
+```bash
+sudo mkdir -p /mnt/umu_img /mnt/umu_root
+
+# disk.img の場所は環境に合わせる（例：/root/disk.img）
+sudo mount -o loop /root/disk.img /mnt/umu_img
+sudo mount /dev/vdb1 /mnt/umu_root
+
+sudo cp -a /mnt/umu_img/. /mnt/umu_root/
+sync
+
+sudo umount /mnt/umu_root
+sudo umount /mnt/umu_img
+```
+
+観測点（UmuOS rootfs 側に最低限があるか）：
+
+```bash
+sudo mount /dev/vdb1 /mnt/umu_root
+ls -l /mnt/umu_root/sbin/init /mnt/umu_root/etc/inittab /mnt/umu_root/etc/init.d/rcS
+sudo umount /mnt/umu_root
+```
+
+## 4.4 UmuOS rootfs 側のネットワーク設定（telnet成功条件）
+
+Rocky通常起動で、現在のグローバルIPとデフォルトGWを控える：
+
+```bash
+ip a
+ip r
+```
+
+その値を UmuOS の `/etc/umu/network.conf` に反映（例）：
+
+```bash
+sudo mount /dev/vdb1 /mnt/umu_root
+sudo tee /mnt/umu_root/etc/umu/network.conf >/dev/null <<'EOF'
+IFNAME=eth0
+MODE=static
+IP=<VPSのグローバルIP>/<prefix>
+GW=<デフォルトGW>
+DNS=8.8.8.8
+EOF
+
+sudo umount /mnt/umu_root
+```
+
+注意：VPSによっては“静的”ではなく、DHCPやクラウド側の仕組みが必要な場合がある。
+その場合は `rcS` のDHCP対応（`udhcpc`）が必要になるので、ここで止めて「方式の再設計」に戻す。
+
+## 4.5 initramfs（UmuOSの /init）を Rocky の /boot に配置
+
+Rockyの kernel はそのまま使い、initramfs だけ UmuOS のものを使う。
+
+配置例（ファイル名は自由）：
+
+```bash
+sudo cp /root/initrd.img-umuos017 /boot/initrd.img-umuos017
+sudo ls -l /boot/initrd.img-umuos017
+```
+
+ここでいう `initrd.img-umuos017` は、UmuOS-0.1.7-base-stable の initramfs 成果物（`/init` を含む）を指す。
+（手元で作ってscpするか、isoから取り出す。中に `/bin/switch_root` が必要。）
+
+## 4.6 GRUB へ UmuOS 起動エントリを追加（ワンショット前提）
+
+まず Rocky の kernel ファイル名を確認：
+
+```bash
+ls -l /boot/vmlinuz-*
+```
+
+次に `/etc/grub.d/40_custom` へ追記する（例、vmlinuz名は環境で置換）：
+
+```bash
+sudo tee -a /etc/grub.d/40_custom >/dev/null <<'EOF'
+
+menuentry 'UmuOS (switch_root to ext4 UUID)' {
+	linux /vmlinuz-<ROCKY_KERNEL_VERSION> \
+		root=UUID=d2c0b3c3-0b5e-4d24-8c91-09b3a4fb0c15 \
+		rw \
+		console=tty0 console=ttyS0,115200n8 \
+		loglevel=7 \
+		panic=-1 \
+		net.ifnames=0 biosdevname=0
+	initrd /initrd.img-umuos017
+}
+EOF
+```
+
+`grub2-mkconfig` の出力先は環境で違う：
+
+```bash
+# BIOSの典型
+sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+
+# UEFIの典型（存在する方を使う）
+sudo grub2-mkconfig -o /boot/efi/EFI/rocky/grub.cfg
+```
+
+## 4.7 次回だけ UmuOS エントリで起動（失敗しても戻れる）
+
+```bash
+sudo grub2-reboot 'UmuOS (switch_root to ext4 UUID)'
+sudo reboot
+```
+
+## 4.8 成功確認（自宅からtelnet）
+
+かごや側FWで 23/TCP を「自宅の送信元IPのみ許可」したうえで：
+
+```bash
+telnet <VPSのグローバルIP> 23
+```
+
+`login:` が出て、ログインできれば成功。
+
+---
+
+# 5. ファイル運用ルート（disk.img をそのまま使いたい場合：要改造）
+
+このルートは「disk.imgをファイルとして置く」前提。
+現状の `init.c` は `/dev/loop*` を走査しないため、少なくとも次が必要：
+
+1) `init.c` の候補に `loop` を追加（例：`is_candidate_dev_name()` に `loop` を含める）
+2) initramfs 内で `disk.img` を loop デバイスへ関連付け（`losetup` or `mount -o loop`）
+3) その loop デバイスの UUID を `root=UUID=...` と一致させる、または `root=` の意味を拡張する
+
+さらに「disk.imgファイルが置かれている元のFS」を initramfs で先にマウントする必要がある。
+（例：`imgdev=UUID=<Rockyの/パーティションUUID>` と `imgpath=/path/to/disk.img` のような追加I/Fを設計する）
+
+---
+
+# 6. トラブルシュート（完成形向け）
+
+## 6.1 telnetで `login:` が出ない
+
+典型原因：ネットワークが上がっていない。
+- かごや側FWが閉じている
+- UmuOS の `/etc/umu/network.conf` が現実のIP/GWとズレている
+- NIC名が `eth0` になっていない（`net.ifnames=0 biosdevname=0` が効いていない）
+
+切り分け（管理コンソールで入れた場合）：
+
+```sh
+ip a
+ip r
+ps w | grep telnetd | grep -v grep || true
+cat /etc/umu/network.conf
+```
+
+## 6.2 initramfs で root が見つからない（switch_rootに到達しない）
+
+原因候補：
+- `root=UUID=...` のUUIDが、実際のブロックデバイスUUIDと一致していない
+- ブロックデバイス名が `vd* / sd* / nvme*` 以外（特殊環境）
+
+対策：
+- Rocky通常起動で `blkid` し、UUIDを再確認
+- UmuOS rootfs 用デバイスを一般的な形（例：/dev/vdb1）にする
+
+## 6.3 ロールバックできない
+
+対策（設計）：
+- `grub2-reboot` のワンショット運用を守る
+- 管理コンソール/レスキュー経路を最初に確保
+
+---
+
+# 付録A. 旧案（参考）：Rocky上でQEMU起動してUmuOSへ入るプラン
 
 以下は「RockyをホストとしてQEMUでUmuOSを起動する」案。
 完成形（Rockyがswitch_rootしてUmuOS化）とは別物なので、参考として残す。
