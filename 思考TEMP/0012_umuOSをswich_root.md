@@ -190,7 +190,7 @@ telnet 成功には、UmuOS 側が次を満たす必要がある：
 
 手順案：
 1) GRUBへ UmuOS 起動エントリを追加（40_custom等）
-2) `grub2-mkconfig` で反映（UEFI/BIOSで出力先が違うので注意）
+2) `grub2-mkconfig` で反映（このVPSはUEFIなので、`/etc/grub2-efi.cfg` の実体へ出力する）
 3) `grub2-reboot '<エントリ名>'` で次回だけ UmuOSエントリを選ぶ
 4) 再起動
 5) 失敗したら管理コンソールで Rocky エントリへ戻す
@@ -333,15 +333,21 @@ menuentry 'UmuOS (switch_root to ext4 UUID)' {
 EOF
 ```
 
-`grub2-mkconfig` の出力先は環境で違う：
+UEFI（Rocky 9.7）では、生成先を間違える事故が多いので、**`/etc/grub2-efi.cfg` の実体パス**へ出力する。
 
 ```bash
-# BIOSの典型
-sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+# まず「正しい生成先」を確認（環境依存の差を吸収する）
+readlink -f /etc/grub2-efi.cfg
 
-# UEFIの典型（存在する方を使う）
-sudo grub2-mkconfig -o /boot/efi/EFI/rocky/grub.cfg
+# そのパスへ grub.cfg を生成
+sudo grub2-mkconfig -o "$(readlink -f /etc/grub2-efi.cfg)"
+
+# 追加したmenuentryが入ったか軽く確認
+sudo grep -n "menuentry 'UmuOS (switch_root to ext4 UUID)'" "$(readlink -f /etc/grub2-efi.cfg)" || true
 ```
+
+補足：`/boot/efi/EFI/rocky/grub.cfg` が典型だが、ディレクトリ名が `rocky` 以外のこともあるため
+（`/boot/efi/EFI/` 配下を使う構成等）、上の方法が安全。
 
 ## 4.7 次回だけ UmuOS エントリで起動（失敗しても戻れる）
 
