@@ -120,10 +120,33 @@ UmuOSの“学習”としても、どこからが自分の責務かが見えや
 	- GRUBの基本パラメータ（kernel cmdlineの基礎）
 - `/etc/grub.d/40_custom`
 	- UmuOS起動用の `menuentry` を置く場所（運用の正）
+- `/etc/grub2.cfg`（※通常はsymlink）
+	- このVPSは **BIOS(Legacy) boot** だったので、実際に参照される grub.cfg の入口はこれ
+- `/boot/grub2/grub.cfg`
+	- 上の `/etc/grub2.cfg` が指す実体（今回の環境ではここが正）
+
+（UEFI環境へ移した場合のための控え：）
 - `/etc/grub2-efi.cfg`（※通常はsymlink）
-	- UEFIで実際に参照される grub.cfg への入口（/boot/grub2/grub.cfg でいいですかね）
+	- UEFIで参照される grub.cfg の入口
 - `/boot/efi/EFI/*/grub.cfg`（存在する場合）
-	- 実体の grub.cfg。`readlink -f /etc/grub2-efi.cfg` で実体パスを確認して、それを保存する（/boot/grub2/grub.cfg でいいですかね）
+	- UEFI側 grub.cfg の実体候補。`readlink -f /etc/grub2-efi.cfg` で実体パスを確認して保存する
+
+補足（回答）：
+- いまの実機確認結果：`test -d /sys/firmware/efi && echo UEFI || echo BIOS` → **BIOS(Legacy)**
+- よって、この環境で grub2-mkconfig の生成先として正しいのは基本的に **`/etc/grub2.cfg` の実体**（典型は `/boot/grub2/grub.cfg`）。
+
+確認コマンド：
+
+```bash
+# UEFIかどうか
+test -d /sys/firmware/efi && echo UEFI || echo BIOS
+
+# BIOSで本当に使われるgrub.cfgの実体
+readlink -f /etc/grub2.cfg 2>/dev/null || true
+
+# （参考）UEFIで本当に使われるgrub.cfgの実体
+readlink -f /etc/grub2-efi.cfg 2>/dev/null || true
+```
 
 ## B. /boot（必須：どのkernel/initramfsで起動しているかの証拠）
 
@@ -273,7 +296,7 @@ telnet 成功には、UmuOS 側が次を満たす必要がある：
 
 手順案：
 1) GRUBへ UmuOS 起動エントリを追加（40_custom等）
-2) `grub2-mkconfig` で反映（このVPSはUEFIなので、`/etc/grub2-efi.cfg` の実体へ出力する）
+2) `grub2-mkconfig` で反映（このVPSは **BIOS(Legacy)** なので、`/etc/grub2.cfg` の実体へ出力する）
 3) `grub2-reboot '<エントリ名>'` で次回だけ UmuOSエントリを選ぶ
 4) 再起動
 5) 失敗したら管理コンソールで Rocky エントリへ戻す
@@ -416,21 +439,21 @@ menuentry 'UmuOS (switch_root to ext4 UUID)' {
 EOF
 ```
 
-UEFI（Rocky 9.7）では、生成先を間違える事故が多いので、**`/etc/grub2-efi.cfg` の実体パス**へ出力する。
+BIOS(Legacy) boot では、**`/etc/grub2.cfg` の実体パス**へ出力する。
 
 ```bash
 # まず「正しい生成先」を確認（環境依存の差を吸収する）
-readlink -f /etc/grub2-efi.cfg
+readlink -f /etc/grub2.cfg
 
 # そのパスへ grub.cfg を生成
-sudo grub2-mkconfig -o "$(readlink -f /etc/grub2-efi.cfg)"
+sudo grub2-mkconfig -o "$(readlink -f /etc/grub2.cfg)"
 
 # 追加したmenuentryが入ったか軽く確認
-sudo grep -n "menuentry 'UmuOS (switch_root to ext4 UUID)'" "$(readlink -f /etc/grub2-efi.cfg)" || true
+sudo grep -n "menuentry 'UmuOS (switch_root to ext4 UUID)'" "$(readlink -f /etc/grub2.cfg)" || true
 ```
 
-補足：`/boot/efi/EFI/rocky/grub.cfg` が典型だが、ディレクトリ名が `rocky` 以外のこともあるため
-（`/boot/efi/EFI/` 配下を使う構成等）、上の方法が安全。
+補足：BIOSの場合、`/etc/grub2.cfg` の実体は典型的に `/boot/grub2/grub.cfg`。
+UEFIへ移行した環境では `/etc/grub2-efi.cfg` の実体へ出力する。
 
 ## 4.7 次回だけ UmuOS エントリで起動（失敗しても戻れる）
 
