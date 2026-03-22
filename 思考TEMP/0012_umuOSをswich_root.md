@@ -207,6 +207,81 @@ readlink -f /etc/grub2-efi.cfg 2>/dev/null || true
 
 ---
 
+## 調査メモ：かごやVPSのコンソールは tty0 / ttyS0 のどれか？（BIOS環境）
+
+背景：
+- かごやのWEBコンソールが「シリアル（ttyS0）」なのか「VGA（tty0）」なのかで、
+	ブートログや `switch_root` 失敗時の観測性が大きく変わる。
+
+今回の実測（Rocky通常起動時）：
+- `/proc/cmdline` に `console=...` が無い（`rhgb quiet` のみ）
+- `cat /sys/class/tty/console/active` は `tty0`
+- `dmesg` に `ttyS0 ... 16550A` が存在し、virtio-vga/fbcon が primary と出ている
+	- つまり「ttyS0 は存在するが、カーネルコンソールとしては使っていない」状態
+
+### 1) 起動方式と、いま有効なカーネルコンソールを確認
+
+```bash
+test -d /sys/firmware/efi && echo UEFI || echo BIOS
+cat /proc/cmdline
+cat /sys/class/tty/console/active
+```
+
+### 2) ttyS0 が存在するか確認
+
+```bash
+ls -l /dev/ttyS0 /dev/ttyS1 2>/dev/null || true
+dmesg | egrep -i 'ttyS0|ttyS1|hvc0|virtio|serial' | head -n 80
+```
+
+### 3) ttyS0 へカーネルログを出す（console= を追加）
+
+目的：`switch_root` 前後のログを、VGAだけでなくシリアルにも出す。
+
+Rocky（BIOS/Legaacy boot）では `grubby` が安全。
+
+```bash
+sudo grubby --update-kernel=ALL --args="console=tty0 console=ttyS0,115200n8"
+
+# 観測のため、デバッグ中は quiet/rhgb を外すのを推奨（任意）
+sudo grubby --update-kernel=ALL --remove-args="rhgb quiet"
+```
+
+再起動後の確認：
+
+```bash
+cat /proc/cmdline
+cat /sys/class/tty/console/active
+```
+
+期待：
+- `/proc/cmdline` に `console=ttyS0,115200n8` が入る
+- `/sys/class/tty/console/active` が `tty0 ttyS0` のように増える
+
+### 4) かごやWEBコンソールが ttyS0 と対応しているかの判定
+
+Rocky上で：
+
+```bash
+echo "SERIAL TEST $(date)" | sudo tee /dev/ttyS0
+```
+
+これがWEBコンソール画面に出れば「WEBコンソール＝ttyS0」。
+出なければ「WEBコンソール＝tty0（virtio-vga/fbcon側）」の可能性が高い。
+
+---
+
+## 調査メモ：NIC名が ens3 の件（UmuOS側の eth0 前提と衝突する）
+
+今回の実測：
+- `dmesg` で `virtio_net ... ens3: renamed from eth0` が出ている
+
+対策：
+- UmuOS側（`/etc/umu/network.conf`）が `IFNAME=eth0` 前提なら、
+	UmuOS起動用の kernel cmdline に `net.ifnames=0 biosdevname=0` を必ず入れて NIC名を `eth0` に固定する。
+
+---
+
 狙い（完成形の定義）：
 - RockyLinux を「カーネル＋initramfs」まで起動させる
 - initramfs の `/init` が `switch_root` で rootfs を切り替える
