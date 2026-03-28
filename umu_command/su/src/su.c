@@ -22,6 +22,18 @@ static void secure_bzero(void *p, size_t n) {
     }
 }
 
+static int copy_password(char *out, size_t out_len, const char *src) {
+    size_t len;
+
+    if (!out || !src || out_len == 0) return -1;
+
+    len = strlen(src);
+    if (len + 1 > out_len) return -1;
+
+    memcpy(out, src, len + 1);
+    return 0;
+}
+
 static int read_shadow_hash_root(char *out, size_t out_len) {
     FILE *fp = fopen("/etc/shadow", "r");
     if (!fp) {
@@ -62,6 +74,19 @@ static int read_shadow_hash_root(char *out, size_t out_len) {
     fclose(fp);
     fprintf(stderr, "su: root entry not found in /etc/shadow\n");
     return -1;
+}
+
+static int read_password_with_getpass(char *out, size_t out_len) {
+    char *pw = getpass("Password: ");
+    if (!pw) return -1;
+
+    if (copy_password(out, out_len, pw) != 0) {
+        secure_bzero(pw, strlen(pw));
+        return -1;
+    }
+
+    secure_bzero(pw, strlen(pw));
+    return 0;
 }
 
 static int read_password_from_tty(char *out, size_t out_len) {
@@ -137,6 +162,13 @@ static int read_password_from_tty(char *out, size_t out_len) {
     return 0;
 }
 
+static int read_password(char *out, size_t out_len) {
+    if (read_password_with_getpass(out, out_len) == 0) {
+        return 0;
+    }
+    return read_password_from_tty(out, out_len);
+}
+
 int main(void) {
     if (geteuid() != 0) {
         fprintf(stderr, "su: euid!=0 (setuid bit/owner/nosuid を確認)\n");
@@ -147,7 +179,7 @@ int main(void) {
     if (read_shadow_hash_root(shadow_hash, sizeof(shadow_hash)) != 0) return 1;
 
     char pw[512];
-    if (read_password_from_tty(pw, sizeof(pw)) != 0) {
+    if (read_password(pw, sizeof(pw)) != 0) {
         fprintf(stderr, "su: failed to read password\n");
         return 1;
     }
