@@ -51,6 +51,12 @@ typedef struct {
 
 static bool g_use_color = false;
 
+typedef struct {
+    bool enabled;
+    uid_t uid;
+    char label[32];
+} UserFilter;
+
 static void die(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -58,6 +64,10 @@ static void die(const char *fmt, ...) {
     va_end(ap);
     fputc('\n', stdout);
     exit(1);
+}
+
+static void usage(FILE *fp, const char *argv0) {
+    fprintf(fp, "Usage: %s [-u USER]\n", argv0 ? argv0 : "top");
 }
 
 static int read_file_line(const char *path, char *buf, size_t buflen) {
@@ -256,6 +266,30 @@ static void uid_to_name(uid_t uid, char *out, size_t outlen) {
     }
 }
 
+static int parse_user_filter(const char *arg, UserFilter *filter) {
+    if (!arg || !*arg || !filter) return -1;
+
+    struct passwd *pw = getpwnam(arg);
+    if (pw) {
+        filter->enabled = true;
+        filter->uid = pw->pw_uid;
+        snprintf(filter->label, sizeof(filter->label), "%s", pw->pw_name);
+        return 0;
+    }
+
+    char *end = NULL;
+    errno = 0;
+    unsigned long parsed = strtoul(arg, &end, 10);
+    if (errno != 0 || !end || *end != '\0') {
+        return -1;
+    }
+
+    filter->enabled = true;
+    filter->uid = (uid_t)parsed;
+    snprintf(filter->label, sizeof(filter->label), "%lu", parsed);
+    return 0;
+}
+
 static int read_proc_stat(int pid,
                           char *comm, size_t commlen,
                           char *state,
@@ -446,6 +480,7 @@ static void print_header(const CpuTimes *cpu_prev, const CpuTimes *cpu_cur,
 static int collect_procs(ProcRow *rows, int max_rows,
                          PrevProc *prev_out, int max_prev,
                          const PrevProc *prev_in, int prev_in_n,
+                         const UserFilter *user_filter,
                          unsigned long long total_delta_ticks,
                          unsigned long long mem_total_bytes,
                          int *tasks_total, int *tasks_running, int *tasks_sleeping,
@@ -523,6 +558,10 @@ static int collect_procs(ProcRow *rows, int max_rows,
         snprintf(status_path, sizeof(status_path), "/proc/%d/status", pid);
         if (parse_proc_status_uid(status_path, &uid) != 0) {
             uid = 0;
+        }
+
+        if (user_filter && user_filter->enabled && uid != user_filter->uid) {
+            continue;
         }
 
         char user[16];
@@ -612,8 +651,33 @@ static void print_procs(const ProcRow *rows, int nrows, int max_lines) {
     }
 }
 
-int main(void) {
+int main(int argc, char **argv) {
     g_use_color = ansi_color_ok();
+
+    UserFilter user_filter;
+    memset(&user_filter, 0, sizeof(user_filter));
+
+    int opt;
+    while ((opt = getopt(argc, argv, "u:h")) != -1) {
+        switch (opt) {
+            case 'u':
+                if (parse_user_filter(optarg, &user_filter) != 0) {
+                    die("top: unknown user: %s", optarg);
+                }
+                break;
+            case 'h':
+                usage(stdout, argv[0]);
+                return 0;
+            default:
+                usage(stderr, argv[0]);
+                return 1;
+        }
+    }
+
+    if (optind < argc) {
+        usage(stderr, argv[0]);
+        return 1;
+    }
 
     int tty_fd = tty_open();
     struct termios old;
@@ -676,6 +740,7 @@ int main(void) {
         unsigned long long proc_total_ticks = 0;
 
         int nrows = collect_procs(rows, 8192, prev2, 8192, prev, prev_n,
+                      &user_filter,
                                   total_delta, mem_total_bytes,
                                   &tasks_total, &tasks_running, &tasks_sleeping,
                                   &tasks_stopped, &tasks_zombie,
