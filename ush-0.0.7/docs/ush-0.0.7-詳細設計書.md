@@ -252,7 +252,7 @@ musl-gcc -static -O2 -Wall -Wextra -Wshadow -Wpointer-arith -Wwrite-strings \
 - 文字列処理は NUL 終端バイト列として扱い、UTF-8 の意味解釈までは行わない。
 - 日本語を含む展開結果も、そのまま byte 列として次段へ渡す。
 - 0.0.7 では unquoted WORD に対して brace expansion を追加する。
-- 実行順序は「通常の word 展開」→「brace expansion」→「glob」の順にする。
+- 実行順序は「brace expansion」→「通常の word 展開」→「glob」の順にする。
 
 ### 6.3.1 brace expansion の対象と制限
 
@@ -283,13 +283,15 @@ musl-gcc -static -O2 -Wall -Wextra -Wshadow -Wpointer-arith -Wwrite-strings \
 - quote が QUOTE_NONE のときだけ有効にする。
 - `{` と `}` と `,` が top-level で 1 組だけ現れる場合に brace expansion とみなす。
 - 成立しない場合は、単なる通常文字列として扱う。
+- brace expansion は raw の unquoted WORD に対して先に適用し、その後で各生成語に対して $VAR, ${VAR}, $(...) などの通常展開を行う。
+- これにより、変数展開の結果として現れた `{` `}` `,` は brace expansion の再解釈対象にしない。
 - brace expansion の結果に glob メタ文字が含まれる場合、その後の glob 展開へ渡す。
 
 実装上の置き場所:
 
 - `ush_expand_word()` 自体は「1 語を 1 語へ」展開する API のまま維持する。
-- そのため brace expansion は `exec.c` の argv 展開と、`script_exec.c` の for/in や case パターン展開で行う。
-- 具体的には、glob 展開をしている箇所の直前に「1語を複数語へ分割する段」を追加する。
+- そのため brace expansion は `exec.c` の argv 展開と、`script_exec.c` の for/in や case パターン展開で、`ush_expand_word()` を呼ぶ前に行う。
+- 具体的には、raw WORD を brace expansion で 0 個以上の語へ分け、その各要素に対して通常の word 展開を行い、最後に glob を適用する。
 
 ## 6.4 exec
 
@@ -887,9 +889,11 @@ out:
 brace expansion については、次の分担にする。
 
 - tokenize: `{` で始まる unquoted 語を落とさない
-- expand: 変数展開やコマンド置換で 1 語を完成させる
-- exec/script_exec: 完成した 1 語を brace expansion で複数語へ増やす
-- glob: brace expansion 後の各語に対して個別に適用する
+- exec/script_exec: raw の unquoted WORD に対して最初に brace expansion を適用し、必要なら複数語へ増やす
+- expand: brace expansion 後の各語に対して変数展開やコマンド置換で 1 語を完成させる
+- glob: 通常展開後の各語に対して個別に適用する
+
+この順序にしておくと、`${VAR}` 自体は従来通り使え、さらに変数値の中に `{A,B}` のような文字列が入っていても、それを brace expansion として誤展開しない。
 
 つまり、日本語対応のために必要なのは「対話入力で壊さない」ことであり、「内部表現を wide char 化する」ことではない。
 
@@ -905,6 +909,7 @@ brace expansion については、次の分担にする。
 - 日本語を含む引数が外部コマンドへ渡る
 - 日本語を含むファイル名へリダイレクトできる
 - brace expansion で 1 語が複数語へ展開される
+- ${VAR} と brace expansion が同居しても、変数値由来の波括弧を誤って brace expansion しない
 
 対話の左右移動や Backspace そのものは自動化が難しいので、まずは byte 列が壊れないことをバッチ実行で担保し、そのうえで手動確認項目を設ける。
 
@@ -982,6 +987,22 @@ printf '%s\n' pre{A,B}post
 EOF
 out="$($BIN "$BR2" | tr -d '\r')"
 assert_eq brace-prefix-suffix "$out" $'preApost\npreBpost'
+
+BR3=/tmp/ush_brace_3.ush
+cat >"$BR3" <<'EOF'
+X='{A,B}'
+printf '%s\n' "${X}"
+EOF
+out="$($BIN "$BR3" | tr -d '\r')"
+assert_eq brace-var-literal-preserved "$out" '{A,B}'
+
+BR4=/tmp/ush_brace_4.ush
+cat >"$BR4" <<'EOF'
+X=Z
+printf '%s\n' pre{A,${X}}post
+EOF
+out="$($BIN "$BR4" | tr -d '\r')"
+assert_eq brace-before-var "$out" $'preApost\npreZpost'
 
 echo "ALL OK"
 ```
