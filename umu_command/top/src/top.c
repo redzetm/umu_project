@@ -57,6 +57,10 @@ typedef struct {
     char label[32];
 } UserFilter;
 
+typedef struct {
+    bool show_kernel_threads;
+} TopOptions;
+
 static void die(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -67,7 +71,7 @@ static void die(const char *fmt, ...) {
 }
 
 static void usage(FILE *fp, const char *argv0) {
-    fprintf(fp, "Usage: %s [-u USER]\n", argv0 ? argv0 : "top");
+    fprintf(fp, "Usage: %s [-u USER] [-k]\n", argv0 ? argv0 : "top");
 }
 
 static int read_file_line(const char *path, char *buf, size_t buflen) {
@@ -481,6 +485,7 @@ static int collect_procs(ProcRow *rows, int max_rows,
                          PrevProc *prev_out, int max_prev,
                          const PrevProc *prev_in, int prev_in_n,
                          const UserFilter *user_filter,
+                         const TopOptions *opts,
                          unsigned long long total_delta_ticks,
                          unsigned long long mem_total_bytes,
                          int *tasks_total, int *tasks_running, int *tasks_sleeping,
@@ -551,6 +556,11 @@ static int collect_procs(ProcRow *rows, int max_rows,
         unsigned long long shr_bytes = 0;
         if (read_proc_statm_shr(pid, &shr_pages) == 0) {
             shr_bytes = shr_pages * (unsigned long long)page_size;
+        }
+
+        const bool is_kthread = (vs == 0 && res_bytes == 0);
+        if ((!opts || !opts->show_kernel_threads) && is_kthread) {
+            continue;
         }
 
         uid_t uid = 0;
@@ -657,13 +667,19 @@ int main(int argc, char **argv) {
     UserFilter user_filter;
     memset(&user_filter, 0, sizeof(user_filter));
 
+    TopOptions opts;
+    memset(&opts, 0, sizeof(opts));
+
     int opt;
-    while ((opt = getopt(argc, argv, "u:h")) != -1) {
+    while ((opt = getopt(argc, argv, "u:kh")) != -1) {
         switch (opt) {
             case 'u':
                 if (parse_user_filter(optarg, &user_filter) != 0) {
                     die("top: unknown user: %s", optarg);
                 }
+                break;
+            case 'k':
+                opts.show_kernel_threads = true;
                 break;
             case 'h':
                 usage(stdout, argv[0]);
@@ -741,6 +757,7 @@ int main(int argc, char **argv) {
 
         int nrows = collect_procs(rows, 8192, prev2, 8192, prev, prev_n,
                       &user_filter,
+                      &opts,
                                   total_delta, mem_total_bytes,
                                   &tasks_total, &tasks_running, &tasks_sleeping,
                                   &tasks_stopped, &tasks_zombie,
